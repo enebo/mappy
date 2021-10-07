@@ -1,0 +1,16 @@
+[package]
+name = "mappy"
+version = "0.1.0"
+edition = "2018"
+
+[dev-dependencies]
+criterion = "0.3.1"
+rand = "0.7.3"
+
+[[bench]]
+name = "shortest_path"
+harness = false
+
+[dependencies]
+nalgebra = "0.29.0"
+pathfinding = "2.2.1"

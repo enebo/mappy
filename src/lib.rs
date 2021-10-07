@@ -68,11 +68,11 @@ struct CoordIterator<'a> {
     loc: Point,
     // Current index in POINTS
     index: usize,
-    available: &'a dyn Fn(&Map, &Point, usize) -> bool
+    available: &'a dyn Fn(&Tile) -> bool
 }
 
 impl<'a> CoordIterator<'a> {
-    fn new(map: &'a Map, loc: Point, available: &'a (dyn Fn(&Map, &Point, usize) -> bool + 'a)) -> Self {
+    fn new(map: &'a Map, loc: Point, available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> Self {
         Self {
             map,
             loc,
@@ -106,10 +106,9 @@ impl<'a> Iterator for CoordIterator<'a> {
             if !nx.is_negative() {
                 let ny = (self.loc.y as isize) + dy;
                 if !ny.is_negative() {
-                    let new_loc = Point::new(nx as usize, ny as usize);
-                    if let Some(tile) = self.map.at(&new_loc) {
-                        if (self.available)(&self.map, &new_loc, tile.weight) {
-                            return Some((new_loc, tile.weight))
+                    if let Some(tile) = self.map.at_raw(nx as usize, ny as usize) {
+                        if (self.available)(&tile) {
+                            return Some((Point::new(nx as usize, ny as usize), tile.weight))
                         }
                     }
                 }
@@ -137,6 +136,14 @@ impl Map {
         }
 
         None
+    }
+
+    fn at_raw(&self, x: usize, y: usize) -> Option<&Tile> {
+        if x >= self.width || y >= self.height {
+            None
+        } else {
+            Some(&self.map[y * self.width + x])
+        }
     }
 
     fn is_valid_loc(&self, loc: &Point) -> Option<usize> {
@@ -167,7 +174,7 @@ impl Map {
     }
 
     // Assumes valid point
-    fn adjacent_ats<'a>(&'a self, loc: Point, available: &'a (dyn Fn(&Map, &Point, usize) -> bool + 'a)) -> impl Iterator<Item=(Point, usize)> + 'a {
+    fn adjacent_ats<'a>(&'a self, loc: Point, available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> impl Iterator<Item=(Point, usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
@@ -179,7 +186,7 @@ impl Map {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &Point, end: &Point, available: &dyn Fn(&Map, &Point, usize) -> bool) -> Option<(Vec<Point>, usize)> {
+    pub fn shortest_path(&self, start: &Point, end: &Point, available: &dyn Fn(&Tile) -> bool) -> Option<(Vec<Point>, usize)> {
         astar(&start,
               |i| self.adjacent_ats(i.clone(), available),
               |i| Self::distance(i, end),
@@ -270,7 +277,7 @@ mod tests {
     fn test_adjacent_ats() {
         let width = 5;
         let map = Map::new(width, 10, '.', 1);
-        let available = |map: &Map, point: &Point, weight| map.at(point).unwrap().id == '.';
+        let available = |tile: &Tile| tile.id == '.';
 
         //  +--
         //  |xo
@@ -327,7 +334,7 @@ mod tests {
                 assert_eq!(map.at(map.at_xy(1, 1).unwrap()), TileType::Floor);*/
         println!("{}", map);
 
-        let available = |map: &Map, point: &Point, weight| map.at(point).unwrap().id == '.';
+        let available = |tile: &Tile| tile.id == '.';
         let start = Point::new(1, 1);
         let end = Point::new(12, 1);
         let path = map.shortest_path(&start, &end, &available);

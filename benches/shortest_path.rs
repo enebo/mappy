@@ -26,7 +26,7 @@ fn make_map(start: Point, end: Point) -> Map {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let (start, end) = (Point::new(1, MAP_HEIGHT - 1), Point::new(MAP_WIDTH - 3, MAP_HEIGHT - 1));
-    let available = |map: &Map, point: &Point, weight| map.at(point).unwrap().id == '.';
+    let available = |tile: &Tile| tile.id == '.';
 
     c.bench_function("a_star_test_map", |b| {
         b.iter(|| {

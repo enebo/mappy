@@ -68,14 +68,16 @@ struct CoordIterator<'a> {
     loc: Point,
     // Current index in POINTS
     index: usize,
+    available: &'a dyn Fn(&Map, &Point, usize) -> bool
 }
 
 impl<'a> CoordIterator<'a> {
-    fn new(map: &'a Map, loc: Point) -> Self {
+    fn new(map: &'a Map, loc: Point, available: &'a (dyn Fn(&Map, &Point, usize) -> bool + 'a)) -> Self {
         Self {
             map,
             loc,
             index: 0,
+            available
         }
     }
 }
@@ -92,11 +94,6 @@ const POINTS: [(isize, isize); 8] = [
 ];
 
 
-dsflfjdskl
-// Make shortest path accept Fn which will then get passed to CoordIter so it only provides
-// valid paths via next().  This will remove the need for filter and solve my issue with
-// having to access Map from within the Fn.
-
 impl<'a> Iterator for CoordIterator<'a> {
     type Item = (Point, usize);
 
@@ -111,7 +108,9 @@ impl<'a> Iterator for CoordIterator<'a> {
                 if !ny.is_negative() {
                     let new_loc = Point::new(nx as usize, ny as usize);
                     if let Some(tile) = self.map.at(&new_loc) {
-                        return Some((new_loc, tile.weight))
+                        if (self.available)(&self.map, &new_loc, tile.weight) {
+                            return Some((new_loc, tile.weight))
+                        }
                     }
                 }
             }
@@ -132,7 +131,7 @@ impl Map {
 
     /// Note: Assumes all index accesses will get an index from a method which will prepare
     /// a safe index.
-    fn at(&self, loc: &Point) -> Option<&Tile> {
+    pub fn at(&self, loc: &Point) -> Option<&Tile> {
         if let Some(index) = self.is_valid_loc(loc) {
             return Some(&self.map[index]);
         }
@@ -168,8 +167,8 @@ impl Map {
     }
 
     // Assumes valid point
-    fn adjacent_ats<'a>(&'a self, loc: Point) -> impl Iterator<Item=(Point, usize)> + 'a {
-        CoordIterator::new(self, loc)
+    fn adjacent_ats<'a>(&'a self, loc: Point, available: &'a (dyn Fn(&Map, &Point, usize) -> bool + 'a)) -> impl Iterator<Item=(Point, usize)> + 'a {
+        CoordIterator::new(self, loc, available)
     }
 
     fn distance(p1: &Point, p2: &Point) -> usize {
@@ -180,9 +179,9 @@ impl Map {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &Point, end: &Point) -> Option<(Vec<Point>, usize)> {
+    pub fn shortest_path(&self, start: &Point, end: &Point, available: &dyn Fn(&Map, &Point, usize) -> bool) -> Option<(Vec<Point>, usize)> {
         astar(&start,
-              |i| self.adjacent_ats(i.clone()).filter(|(i, _)| self.at(i).unwrap().id == '.'),
+              |i| self.adjacent_ats(i.clone(), available),
               |i| Self::distance(i, end),
               |i| i == end)
     }
@@ -271,18 +270,19 @@ mod tests {
     fn test_adjacent_ats() {
         let width = 5;
         let map = Map::new(width, 10, '.', 1);
+        let available = |map: &Map, point: &Point, weight| map.at(point).unwrap().id == '.';
 
         //  +--
         //  |xo
         //  |oo
-        let ats = map.adjacent_ats(Point::new(0, 0));
+        let ats = map.adjacent_ats(Point::new(0, 0), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
         assert_eq!(ats, vec![(1, 0), (0, 1), (1, 1)]);
 
         //  +---
         //  |oxo
         //  |ooo
-        let ats = map.adjacent_ats(Point::new(1, 0));
+        let ats = map.adjacent_ats(Point::new(1, 0), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
         assert_eq!(ats, vec![(0, 0), (2, 0), (0, 1), (1, 1), (2, 1)]);
 
@@ -290,21 +290,21 @@ mod tests {
         //  |ooo
         //  |oxo
         //  |ooo
-        let ats = map.adjacent_ats(Point::new(1, 1));
+        let ats = map.adjacent_ats(Point::new(1, 1), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
         assert_eq!(ats, vec![(0, 0), (1, 0), (2, 0), (0, 1), (2, 1), (0, 2), (1, 2), (2, 2)]);
 
         // --+
         // ox|
         // oo|
-        let ats = map.adjacent_ats(Point::new(4, 0));
+        let ats = map.adjacent_ats(Point::new(4, 0), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
         assert_eq!(ats, vec![(3, 0), (3, 1), (4, 1)]);
 
         // oo|
         // ox|
         // --+
-        let ats = map.adjacent_ats(Point::new(4, 9));
+        let ats = map.adjacent_ats(Point::new(4, 9), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
         assert_eq!(ats, vec![(3, 8), (4, 8), (3, 9)]);
     }
@@ -327,9 +327,10 @@ mod tests {
                 assert_eq!(map.at(map.at_xy(1, 1).unwrap()), TileType::Floor);*/
         println!("{}", map);
 
+        let available = |map: &Map, point: &Point, weight| map.at(point).unwrap().id == '.';
         let start = Point::new(1, 1);
         let end = Point::new(12, 1);
-        let path = map.shortest_path(&start, &end);
+        let path = map.shortest_path(&start, &end, &available);
         if let Some(path) = path {
             let (path, distance) = path;
             println!("distance {}", distance);

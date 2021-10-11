@@ -45,7 +45,7 @@ impl<'a> MapIterator<'a> {
 }
 
 impl<'a> Iterator for MapIterator<'a> {
-    type Item = (Point, Tile);
+    type Item = (Point, &'a Tile);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.map.map.len() {
@@ -56,8 +56,7 @@ impl<'a> Iterator for MapIterator<'a> {
         let tile = self.map.at(&point).unwrap();
         self.index += 1;
 
-        // FIXME: It bugs me that I am having to clone immutable data here.
-        Some((point, tile.clone()))
+        Some((point, tile))
     }
 }
 
@@ -182,7 +181,7 @@ impl Map {
         absdiff(p1.x, p2.x) + absdiff(p1.y, p2.y)
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item=(Point, Tile)> + 'a {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item=(Point, &'a Tile)> + 'a {
         MapIterator::new(self)
     }
 

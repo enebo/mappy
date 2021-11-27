@@ -3,13 +3,17 @@ use core::fmt;
 use nalgebra::{Point2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
+use rand::{Rng, thread_rng};
 
 pub type Point = Point2<usize>;
+
+pub mod rectangle;
+pub mod builders;
 
 #[derive(Debug)]
 pub struct MyError {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Tile {
     pub id: char,
     weight: usize,
@@ -24,9 +28,11 @@ impl Tile {
     }
 }
 
+// FIXME: dynamic maps vs pre-compiled sizes and using a primitive array.
+// This also makes me wonder how much you could compile a map so more actions with a map are precomputed.
 pub struct Map {
-    width: usize,
-    height: usize,
+    pub width: usize,
+    pub height: usize,
     map: Vec<Tile>
 }
 
@@ -92,6 +98,16 @@ const POINTS: [(isize, isize); 8] = [
     (1, 1)     // lower right
 ];
 
+#[inline]
+pub const fn math_is_hard(x: usize, d: isize) -> Option<usize> {
+    let result = x as isize + d;
+
+    if result.is_negative() {
+        None
+    } else {
+        Some(result as usize)
+    }
+}
 
 impl<'a> Iterator for CoordIterator<'a> {
     type Item = (Point, usize);
@@ -101,10 +117,8 @@ impl<'a> Iterator for CoordIterator<'a> {
             let (dx, dy) = POINTS[self.index];
             self.index += 1;
 
-            let nx = (self.loc.x as isize) + dx;
-            if !nx.is_negative() {
-                let ny = (self.loc.y as isize) + dy;
-                if !ny.is_negative() {
+            if let Some(nx) = math_is_hard(self.loc.x, dx) {
+                if let Some(ny) = math_is_hard(self.loc.y, dy) {
                     if let Some(tile) = self.map.at_raw(nx as usize, ny as usize) {
                         if (self.available)(&tile) {
                             return Some((Point::new(nx as usize, ny as usize), tile.weight))
@@ -127,14 +141,40 @@ impl Map {
         }
     }
 
+    pub fn generate_ascii_map(ascii_map: &str) -> Result<Self, ()> {
+        let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
+        let height = rows.len();
+
+        if height == 0 {
+            return Err(())
+        }
+
+        let width = rows[0].len();
+
+        // verify all lines are same length;
+        if let Some(_) = rows.iter().find(|e| e.len() != width) {
+            return Err(())
+        }
+
+        let mut map = Map::new(width, height, '.', 1);
+
+        for (y, row) in rows.iter().enumerate() {
+            for (x, tile) in row.chars().enumerate() {
+                // FIXME: All tiles will be immutable so share them all.
+                let tile = Tile::new(tile, 1);
+                let point = Point::new(x, y);
+
+                map.set_at(&point, tile).unwrap();
+            }
+        }
+
+        Ok(map)
+    }
+
     /// Note: Assumes all index accesses will get an index from a method which will prepare
     /// a safe index.
     pub fn at(&self, loc: &Point) -> Option<&Tile> {
-        if let Some(index) = self.is_valid_loc(loc) {
-            return Some(&self.map[index]);
-        }
-
-        None
+        self.is_valid_loc(loc).map(|index| &self.map[index])
     }
 
     fn at_raw(&self, x: usize, y: usize) -> Option<&Tile> {
@@ -162,6 +202,7 @@ impl Map {
         }
     }
 
+    #[inline]
     fn at_xy_raw(&self, loc: &Point) -> usize {
         loc.y * self.width + loc.x
     }
@@ -173,10 +214,12 @@ impl Map {
     }
 
     // Assumes valid point
+    #[inline]
     fn adjacent_ats<'a>(&'a self, loc: Point, available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> impl Iterator<Item=(Point, usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
+    #[inline]
     fn distance(p1: &Point, p2: &Point) -> usize {
         absdiff(p1.x, p2.x) + absdiff(p1.y, p2.y)
     }
@@ -190,6 +233,15 @@ impl Map {
               |i| self.adjacent_ats(i.clone(), available),
               |i| Self::distance(i, end),
               |i| i == end)
+    }
+
+    pub fn find_random_tile_loc(&self, tile_id: char) -> Point {
+        loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
+            let index = thread_rng().gen_range(0, self.map.len());
+            if self.map.get(index).unwrap().id == tile_id {
+                return self.point_for(index);
+            }
+        }
     }
 }
 
@@ -207,37 +259,6 @@ impl Display for Map {
 #[cfg(test)]
 mod tests {
     use crate::{Map, Point, Tile};
-
-    pub fn generate_ascii_map(ascii_map: &str) -> Option<Map> {
-        let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
-        let height = rows.len();
-
-        if height == 0 {
-            return None;
-        }
-
-        let width = rows[0].len();
-
-        // verify all lines are same length;
-        if let Some(_) = rows.iter().find(|e| e.len() != width) {
-            return None;
-        }
-
-        println!("Making map of size: {}x{}", width, height);
-        let mut map = Map::new(width, height, '.', 1);
-
-        for (y, row) in rows.iter().enumerate() {
-            for (x, tile) in row.chars().enumerate() {
-                // FIXME: All tiles will be immutable so share them all.
-                let tile = Tile::new(tile, 1);
-                let point = Point::new(x, y);
-
-                map.set_at(&point, tile).unwrap();
-            }
-        }
-
-        Some(map)
-    }
 
     #[test]
     fn test_is_valid_loc() {
@@ -326,7 +347,7 @@ mod tests {
                                 ##############";
 
 
-        let mut map = generate_ascii_map(map_string).unwrap();
+        let mut map = Map::generate_ascii_map(map_string).unwrap();
         /*        assert_eq!(map.width, 14);
                 assert_eq!(map.height, 4);
                 assert_eq!(map.at(map.at_xy(0, 0).unwrap()), TileType::Wall);
@@ -355,7 +376,7 @@ mod tests {
         let map_string = "123\n\
                                 #.#\n\
                                 ###";
-        let map = generate_ascii_map(map_string).unwrap();
+        let map = Map::generate_ascii_map(map_string).unwrap();
 
         let string: String = map.iter().map(|(_, tile)| tile.id).collect();
 

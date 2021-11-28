@@ -9,6 +9,7 @@ pub type Point = Point2<usize>;
 
 pub mod rectangle;
 pub mod builders;
+mod field_of_view;
 
 #[derive(Debug)]
 pub struct MyError {}

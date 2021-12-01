@@ -1,4 +1,4 @@
-use crate::{Map, Point, Tile};
+use crate::{Map, Overlay, Point, Tile};
 
 const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
     (1, 0, 0, 1),
@@ -16,13 +16,9 @@ const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
 
 // http://www.roguebasin.com/index.php/FOV_using_recursive_shadowcasting
 pub fn calculate_field_of_view(map: &mut Map, start: &Point, radius: usize,
-                               light_map: &mut Vec<bool>, visible: &dyn Fn(&Tile) -> bool) {
-    for point in &mut light_map.iter_mut() {
-        *point = false;
-    }
-
-    let index = map.width * start.y + start.x;
-    let _ = std::mem::replace(&mut light_map[index], true);
+                               light_map: &mut Overlay<bool>, visible: &dyn Fn(&Tile) -> bool) {
+    light_map.reset();
+    light_map.set((start.x, start.y), true);
 
     for multipliers in MULTIPLIERS {
         shadow_cast(1, 1.0, 0.0, multipliers, radius, start, light_map, map, visible);
@@ -30,7 +26,7 @@ pub fn calculate_field_of_view(map: &mut Map, start: &Point, radius: usize,
 }
 
 fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
-               radius: usize, start: &Point, light_map: &mut Vec<bool>, map: &Map,
+               radius: usize, start: &Point, light_map: &mut Overlay<bool>, map: &Map,
                visible: &dyn Fn(&Tile) -> bool) {
     if begin < end {
         return
@@ -51,7 +47,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
                 continue
             }
 
-            let current = Point::new(current_x as usize, current_y as usize);
+            let current = (current_x as usize, current_y as usize);
 
             // Slope at right edge of current square.
             let right_slope = (dx as f32 + 0.5) / (dy as f32 - 0.5);
@@ -60,7 +56,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
             }
 
             // FIXME: We need to know valid to change light map but it feels like extra work is happening.
-            if map.is_valid_loc(&current).is_none() {
+            if !map.is_valid_loc(current) {
                 continue
             }
 
@@ -70,12 +66,11 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
             }
 
             if dx * dx + dy * dy < radius_2 {
-                let index = map.width * current.y + current.x;
-                let _ = std::mem::replace(&mut light_map[index], true);
+                light_map.set(current, true);
             }
 
             if blocked {
-                if !(visible)(&map.at(&current).unwrap()) {
+                if !(visible)(&map.get(current).unwrap()) {
                     // Already blocked for the last 'column'.  More of the same continue on until
                     // we find an opon spot.  Keep track of slope to use it when we unblock (nothing
                     // to the left can be seen from this point on next rows).
@@ -87,7 +82,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
                     begin = new_begin;
                 }
             } else {
-                if !(visible)(&map.at(&current).unwrap()) && y < radius {
+                if !(visible)(&map.get(current).unwrap()) && y < radius {
                     // Ran into our first blocked item.  Scan next row but only up to new slope since
                     // we know we can see nothing more to the right of it.
                     blocked = true;
@@ -115,10 +110,10 @@ mod tests {
                            .................\n\
                            .................\n";
 
-    const FOV_ANSWER_7_6: &str = "......@@@@@@....@\n\
-                                  .......@@@@....@@\n\
-                                  .......@@@....@.@\n\
-                                  .......@@........\n\
+    const FOV_ANSWER_7_6: &str = "......######....#\n\
+                                  .......####....##\n\
+                                  .......###....#.#\n\
+                                  .......##........\n\
                                   .................\n\
                                   .................\n\
                                   .................\n";
@@ -127,14 +122,13 @@ mod tests {
     fn test_fov() {
         let start = Point::new(7, 6);
         let mut map = Map::generate_ascii_map(FOV_MAP).unwrap();
-        let mut light_map = vec![false; map.width * map.height];
+        let mut light_map = map.create_light_map();
         let visible = |tile: &Tile| tile.id == '.';
         calculate_field_of_view(&mut map, &start, 20, &mut light_map, &visible);
 
-        let ascii: Vec<char> = light_map.iter().map(|v| if *v { '.'} else { '@' }).collect();
-        let result: String = ascii.chunks(map.width).map(|chunk| chunk.iter().collect::<String>() + "\n" ).collect();
+        let ascii = format!("{}", &light_map);
 
-        println!("{}", result);
-        assert_eq!(result, FOV_ANSWER_7_6)
+        println!("{}", ascii);
+        assert_eq!(ascii, FOV_ANSWER_7_6)
     }
 }

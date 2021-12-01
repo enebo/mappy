@@ -1,7 +1,8 @@
 use std::cmp::{max, min};
 use rand::{Rng, thread_rng};
-use crate::{Map, Point, Tile};
+use crate::map::Map;
 use crate::rectangle::{Rectangle, RectangleIteratorType};
+use crate::tile::Tile;
 
 
 pub struct RoomBuilder<'a> {
@@ -68,20 +69,21 @@ impl<'a> RoomBuilder<'a> {
                 RectangleIteratorType::BODY => self.floor_tile
             };
 
+            let point = (point.x, point.y);
             // FIXME: This tile cloning is driving me mad
-            self.map.set_at(&point, tile.clone()).unwrap();
+            self.map.set(point, tile.clone());
         }
     }
 
     fn add_horizontal_tunnel(&mut self, start_x: usize, end_x: usize, y: usize) {
         for x in min(start_x, end_x) ..= max(start_x, end_x) {
-            self.map.set_at(&Point::new(x, y), self.floor_tile.clone()).unwrap();
+            self.map.set((x, y), self.floor_tile.clone());
         }
     }
 
     fn add_vertical_tunnel(&mut self, start_y: usize, end_y: usize, x: usize) {
         for y in min(start_y, end_y) ..= max(start_y, end_y) {
-            self.map.set_at(&Point::new(x, y), self.floor_tile.clone()).unwrap();
+            self.map.set((x, y), self.floor_tile.clone());
         }
     }
 }

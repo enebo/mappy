@@ -13,5 +13,6 @@ harness = false
 
 [dependencies]
 nalgebra = "0.29.0"
+ndarray = "0.15.4"
 pathfinding = "2.2.1"
 rand = "0.7.3"

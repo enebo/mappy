@@ -9,15 +9,17 @@ fn make_map(start: Point, end: Point) -> Map {
     let mut map = Map::new(MAP_WIDTH, MAP_HEIGHT, '.', 1);
     let mut rng = rand::thread_rng();
 
+    let start = (start.x, start.y);
+    let end = (end.x, end.y);
     // Add random walls
     let n_walls = 200;
     for _ in 0..n_walls {
-        let target = Point::new(
+        let target = (
             rng.gen_range(0, MAP_WIDTH as usize - 1),
-            rng.gen_range(0, MAP_HEIGHT as usize - 1),
+            rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if target != start && target != end {
-            map.set_at(&target, Tile::new('#', 1)).expect("Could not set border tile");
+            map.set(target, Tile::new('#', 1));
         }
     }
 

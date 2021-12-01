@@ -1,11 +1,10 @@
-use crate::Point;
 use rand::{thread_rng, Rng};
 use crate::rectangle::RectangleIteratorType::{BODY, BORDER};
 
 /// Rectangle with a single width border.
 pub struct Rectangle {
-    pub ulc: Point,
-    pub lrc: Point,
+    pub ulc: (usize, usize),
+    pub lrc: (usize, usize),
 }
 
 impl Rectangle {
@@ -17,34 +16,34 @@ impl Rectangle {
         }
 
         Ok(Rectangle {
-            ulc: Point::new(x, y),
-            lrc: Point::new(x + width, y + height)
+            ulc: (x, y),
+            lrc: (x + width, y + height)
         })
     }
 
-    pub fn center(&self) -> Point {
-        Point::new((self.ulc.x + self.lrc.x) / 2, (self.ulc.y + self.lrc.y) / 2)
+    pub fn center(&self) -> (usize, usize) {
+        ((self.ulc.0 + self.lrc.0) / 2, (self.ulc.1 + self.lrc.1) / 2)
     }
 
     pub fn intersect(&self, other: &Rectangle) -> bool {
-        self.ulc.x <= other.lrc.x && self.lrc.x >= other.ulc.x
-            && self.ulc.y <= other.lrc.y && self.lrc.y >= other.ulc.y
+        self.ulc.0 <= other.lrc.0 && self.lrc.0 >= other.ulc.0
+            && self.ulc.1 <= other.lrc.1 && self.lrc.1 >= other.ulc.1
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=(Point, RectangleIteratorType)> {
+    pub fn iter(&self) -> impl Iterator<Item=((usize, usize), RectangleIteratorType)> {
         RectangleIterator::new(self)
     }
 
     pub fn random_x(&self) -> usize {
         let mut rng = thread_rng();
 
-        self.ulc.x + rng.gen_range(0, self.lrc.x - self.ulc.x)
+        self.ulc.0 + rng.gen_range(0, self.lrc.0 - self.ulc.0)
     }
 
     pub fn random_y(&self) -> usize {
         let mut rng = thread_rng();
 
-        self.ulc.y + rng.gen_range(0, self.lrc.y - self.ulc.y)
+        self.ulc.1 + rng.gen_range(0, self.lrc.1 - self.ulc.1)
     }
 }
 
@@ -64,18 +63,18 @@ struct RectangleIterator {
 impl RectangleIterator {
     fn new(rect: &Rectangle) -> Self {
         Self {
-            x_index: rect.ulc.x,
-            y_index: rect.ulc.y,
-            x_beg: rect.ulc.x,
-            y_beg: rect.ulc.y,
-            x_end: rect.lrc.x,
-            y_end: rect.lrc.y,
+            x_index: rect.ulc.0,
+            y_index: rect.ulc.1,
+            x_beg: rect.ulc.0,
+            y_beg: rect.ulc.1,
+            x_end: rect.lrc.0,
+            y_end: rect.lrc.1,
         }
     }
 }
 
 impl Iterator for RectangleIterator {
-    type Item = (Point, RectangleIteratorType);
+    type Item = ((usize, usize), RectangleIteratorType);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.y_index >= self.y_end && self.x_index > self.x_end {
@@ -99,13 +98,12 @@ impl Iterator for RectangleIterator {
         };
 
 
-        Some((Point::new(x, self.y_index), point_type))
+        Some(((x, self.y_index), point_type))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::Point;
     use crate::rectangle::Rectangle;
     use crate::rectangle::RectangleIteratorType::BORDER;
 
@@ -122,12 +120,12 @@ mod tests {
     fn test_center() {
         let rect = Rectangle::new(0, 0, 4, 4).unwrap();
 
-        assert_eq!(rect.center(), Point::new(2, 2));
+        assert_eq!(rect.center(), (2, 2));
 
         // We round down since this is integer result.
         let rect = Rectangle::new(0, 0, 5, 5).unwrap();
 
-        assert_eq!(rect.center(), Point::new(2, 2));
+        assert_eq!(rect.center(), (2, 2));
     }
 
     #[test]
@@ -150,8 +148,8 @@ mod tests {
             .iter()
             .map(|(point, point_type)|
                 format!("({},{},{})",
-                        point.x,
-                        point.y,
+                        point.0,
+                        point.1,
                         if point_type == BORDER { '#' } else { '.' }))
             .collect();
 

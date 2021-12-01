@@ -4,7 +4,7 @@ use ndarray::{Array, Axis, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{Overlay, Point, Tile};
+use crate::{Overlay, Tile};
 
 
 pub struct Map {
@@ -36,7 +36,7 @@ impl<'a> Iterator for MapIterator<'a> {
         }
 
         let loc = self.map.point_for(self.index);
-        let tile = self.map.get(loc).unwrap();
+        let tile = self.map.get(&loc).unwrap();
         self.index += 1;
 
         Some((loc, tile))
@@ -47,17 +47,19 @@ impl<'a> Iterator for MapIterator<'a> {
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
 struct CoordIterator<'a> {
     map: &'a Map,
-    loc: Point,
+    loc_x: usize,
+    loc_y: usize,
     // Current index in POINTS
     index: usize,
     available: &'a dyn Fn(&Tile) -> bool
 }
 
 impl<'a> CoordIterator<'a> {
-    fn new(map: &'a Map, loc: Point, available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> Self {
+    fn new(map: &'a Map, loc: &(usize, usize), available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> Self {
         Self {
             map,
-            loc,
+            loc_x: loc.0,
+            loc_y: loc.1,
             index: 0,
             available
         }
@@ -87,18 +89,18 @@ pub const fn math_is_hard(x: usize, d: isize) -> Option<usize> {
 }
 
 impl<'a> Iterator for CoordIterator<'a> {
-    type Item = (Point, usize);
+    type Item = ((usize, usize), usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.index < POINTS.len() {
             let (dx, dy) = POINTS[self.index];
             self.index += 1;
 
-            if let Some(nx) = math_is_hard(self.loc.x, dx) {
-                if let Some(ny) = math_is_hard(self.loc.y, dy) {
-                    if let Some(tile) = self.map.get((nx, ny)) {
+            if let Some(nx) = math_is_hard(self.loc_x, dx) {
+                if let Some(ny) = math_is_hard(self.loc_y, dy) {
+                    if let Some(tile) = self.map.get(&(nx, ny)) {
                         if (self.available)(&tile) {
-                            return Some((Point::new(nx as usize, ny as usize), tile.weight))
+                            return Some(((nx as usize, ny as usize), tile.weight))
                         }
                     }
                 }
@@ -141,32 +143,26 @@ impl Map {
 
         for (y, row) in rows.iter().enumerate() {
             for (x, tile) in row.chars().enumerate() {
-                map.set((x, y), Tile::new(tile, 1));
+                map.set(&(x, y), Tile::new(tile, 1));
             }
         }
 
         Ok(map)
     }
 
-    /// Note: Assumes all index accesses will get an index from a method which will prepare
-    /// a safe index.
-    pub fn at(&self, loc: &Point) -> Option<&Tile> {
-        self.map.get((loc.x, loc.y))
+    #[inline]
+    pub(crate) fn get(&self, loc: &(usize, usize)) -> Option<&Tile> {
+        self.map.get(*loc)
     }
 
     #[inline]
-    pub(crate) fn get(&self, loc: (usize, usize)) -> Option<&Tile> {
-        self.map.get(loc)
-    }
-
-    #[inline]
-    pub(crate) fn is_valid_loc(&self, loc: (usize, usize)) -> bool {
+    pub(crate) fn is_valid_loc(&self, loc: &(usize, usize)) -> bool {
         loc.0 < self.width && loc.1 < self.height
     }
 
     #[inline]
-    pub fn set(&mut self, loc: (usize, usize), tile: Tile) -> bool {
-        let spot = self.map.get_mut(loc);
+    pub fn set(&mut self, loc: &(usize, usize), tile: Tile) -> bool {
+        let spot = self.map.get_mut(*loc);
         let found = spot.is_some();
 
         if found {
@@ -184,32 +180,32 @@ impl Map {
 
     // Assumes valid point
     #[inline]
-    fn adjacent_ats<'a>(&'a self, loc: Point, available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> impl Iterator<Item=(Point, usize)> + 'a {
+    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
     #[inline]
-    fn distance(p1: &Point, p2: &Point) -> usize {
-        absdiff(p1.x, p2.x) + absdiff(p1.y, p2.y)
+    fn distance(p1: &(usize, usize), p2: &(usize, usize)) -> usize {
+        absdiff(p1.0, p2.0) + absdiff(p1.1, p2.1)
     }
 
     pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Tile)> + 'a {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &Point, end: &Point, available: &dyn Fn(&Tile) -> bool) -> Option<(Vec<Point>, usize)> {
+    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&Tile) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
         astar(&start,
-              |i| self.adjacent_ats(i.clone(), available),
+              |i| self.adjacent_ats(i, available),
               |i| Self::distance(i, end),
               |i| i == end)
     }
 
-    pub fn find_random_tile_loc(&self, tile_id: char) -> Point {
+    pub fn find_random_tile_loc(&self, tile_id: char) -> (usize, usize) {
         loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
             let x = thread_rng().gen_range(0, self.width);
             let y = thread_rng().gen_range(0, self.height);
             if self.map.get((x, y)).unwrap().id == tile_id {
-                return Point::new(x, y)
+                return (x, y)
             }
         }
     }
@@ -227,18 +223,18 @@ impl Display for Map {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Map, Point, Tile};
+    use crate::{Map, Tile};
 
     #[test]
     fn test_is_valid_loc() {
         let width = 5;
         let map = Map::new(width, 10, '.', 1);
 
-        assert!(map.is_valid_loc((0, 0)));
-        assert!(map.is_valid_loc((1, 0)));
-        assert!(map.is_valid_loc((0, 1)));
-        assert!(!map.is_valid_loc((6, 0)));
-        assert!(!map.is_valid_loc((0, 10)));
+        assert!(map.is_valid_loc(&(0, 0)));
+        assert!(map.is_valid_loc(&(1, 0)));
+        assert!(map.is_valid_loc(&(0, 1)));
+        assert!(!map.is_valid_loc(&(6, 0)));
+        assert!(!map.is_valid_loc(&(0, 10)));
     }
 
     #[test]
@@ -257,9 +253,9 @@ mod tests {
         let mut map = Map::new(width, 10, '.', 1);
 
         let loc = (0, 0);
-        assert_eq!(map.get(loc).unwrap().id, '.');
-        map.set(loc, Tile::new('=', 1));
-        assert_eq!(map.get(loc).unwrap().id, '=');
+        assert_eq!(map.get(&loc).unwrap().id, '.');
+        map.set(&loc, Tile::new('=', 1));
+        assert_eq!(map.get(&loc).unwrap().id, '=');
     }
 
     #[test]
@@ -271,37 +267,37 @@ mod tests {
         //  +--
         //  |xo
         //  |oo
-        let ats = map.adjacent_ats(Point::new(0, 0), &available);
-        let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
+        let ats = map.adjacent_ats(&(0, 0), &available);
+        let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(1, 0), (0, 1), (1, 1)]);
 
         //  +---
         //  |oxo
         //  |ooo
-        let ats = map.adjacent_ats(Point::new(1, 0), &available);
-        let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
+        let ats = map.adjacent_ats(&(1, 0), &available);
+        let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(0, 0), (2, 0), (0, 1), (1, 1), (2, 1)]);
 
         //  +---
         //  |ooo
         //  |oxo
         //  |ooo
-        let ats = map.adjacent_ats(Point::new(1, 1), &available);
-        let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
+        let ats = map.adjacent_ats(&(1, 1), &available);
+        let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(0, 0), (1, 0), (2, 0), (0, 1), (2, 1), (0, 2), (1, 2), (2, 2)]);
 
         // --+
         // ox|
         // oo|
-        let ats = map.adjacent_ats(Point::new(4, 0), &available);
-        let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
+        let ats = map.adjacent_ats(&(4, 0), &available);
+        let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(3, 0), (3, 1), (4, 1)]);
 
         // oo|
         // ox|
         // --+
-        let ats = map.adjacent_ats(Point::new(4, 9), &available);
-        let ats: Vec<(usize, usize)> = ats.map(|(i, _)| (i.x, i.y)).collect();
+        let ats = map.adjacent_ats(&(4, 9), &available);
+        let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(3, 8), (4, 8), (3, 9)]);
     }
 
@@ -324,9 +320,7 @@ mod tests {
         println!("{}", map);
 
         let available = |tile: &Tile| tile.id == '.';
-        let start = Point::new(1, 1);
-        let end = Point::new(12, 1);
-        let path = map.shortest_path(&start, &end, &available);
+        let path = map.shortest_path(&(1, 1), &(12, 1), &available);
         if let Some(path) = path {
             let (path, distance) = path;
             println!("distance {}", distance);
@@ -334,7 +328,7 @@ mod tests {
             println!("Path {:?}", route);
             for i in &path {
                 let tile = Tile::new('x', 1);
-                map.set((i.x, i.y), tile);
+                map.set(i, tile);
             }
             println!("{}", map);
         }

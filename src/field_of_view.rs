@@ -1,4 +1,4 @@
-use crate::{Map, Overlay, Point, Tile};
+use crate::{Map, Overlay, Tile};
 
 const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
     (1, 0, 0, 1),
@@ -11,14 +11,13 @@ const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
     (1, 0, 0, -1),
 ];
 
-// FIXME: Replace with some bit datastructure
 // FIXME: probably want a more features FOV map which can be merged with actual map for at least debugging.
 
 // http://www.roguebasin.com/index.php/FOV_using_recursive_shadowcasting
-pub fn calculate_field_of_view(map: &mut Map, start: &Point, radius: usize,
+pub fn calculate_field_of_view(map: &mut Map, start: (usize, usize), radius: usize,
                                light_map: &mut Overlay<bool>, visible: &dyn Fn(&Tile) -> bool) {
     light_map.reset();
-    light_map.set((start.x, start.y), true);
+    light_map.set(start, true);
 
     for multipliers in MULTIPLIERS {
         shadow_cast(1, 1.0, 0.0, multipliers, radius, start, light_map, map, visible);
@@ -26,7 +25,7 @@ pub fn calculate_field_of_view(map: &mut Map, start: &Point, radius: usize,
 }
 
 fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
-               radius: usize, start: &Point, light_map: &mut Overlay<bool>, map: &Map,
+               radius: usize, start: (usize, usize), light_map: &mut Overlay<bool>, map: &Map,
                visible: &dyn Fn(&Tile) -> bool) {
     if begin < end {
         return
@@ -40,8 +39,8 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
         let dy = -1 * y as isize;
         while dx <= 0 {
             dx += 1;
-            let current_x = start.x as isize + dx * mults.0 + dy * mults.1;
-            let current_y = start.y as isize + dx * mults.2 + dy * mults.3;
+            let current_x = start.0 as isize + dx * mults.0 + dy * mults.1;
+            let current_y = start.1 as isize + dx * mults.2 + dy * mults.3;
 
             if current_x < 0 || current_y < 0 { // Make sure we are still on the map.
                 continue
@@ -56,7 +55,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
             }
 
             // FIXME: We need to know valid to change light map but it feels like extra work is happening.
-            if !map.is_valid_loc(current) {
+            if !map.is_valid_loc(&current) {
                 continue
             }
 
@@ -70,9 +69,9 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
             }
 
             if blocked {
-                if !(visible)(&map.get(current).unwrap()) {
+                if !(visible)(&map.get(&current).unwrap()) {
                     // Already blocked for the last 'column'.  More of the same continue on until
-                    // we find an opon spot.  Keep track of slope to use it when we unblock (nothing
+                    // we find an open spot.  Keep track of slope to use it when we unblock (nothing
                     // to the left can be seen from this point on next rows).
                     new_begin = right_slope;
                 } else {
@@ -82,7 +81,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
                     begin = new_begin;
                 }
             } else {
-                if !(visible)(&map.get(current).unwrap()) && y < radius {
+                if !(visible)(&map.get(&current).unwrap()) && y < radius {
                     // Ran into our first blocked item.  Scan next row but only up to new slope since
                     // we know we can see nothing more to the right of it.
                     blocked = true;
@@ -99,7 +98,7 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
 
 #[cfg(test)]
 mod tests {
-    use crate::{Map, Point, Tile};
+    use crate::{Map, Tile};
     use crate::field_of_view::calculate_field_of_view;
 
     const FOV_MAP: &str = ".................\n\
@@ -120,11 +119,10 @@ mod tests {
 
     #[test]
     fn test_fov() {
-        let start = Point::new(7, 6);
         let mut map = Map::generate_ascii_map(FOV_MAP).unwrap();
         let mut light_map = map.create_light_map();
         let visible = |tile: &Tile| tile.id == '.';
-        calculate_field_of_view(&mut map, &start, 20, &mut light_map, &visible);
+        calculate_field_of_view(&mut map, (7, 6), 20, &mut light_map, &visible);
 
         let ascii = format!("{}", &light_map);
 

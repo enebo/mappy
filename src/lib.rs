@@ -1,7 +1,3 @@
-use nalgebra::{Point2};
-
-pub type Point = Point2<usize>;
-
 pub mod rectangle;
 pub mod builders;
 mod field_of_view;

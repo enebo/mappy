@@ -51,11 +51,11 @@ impl<'a> RoomBuilder<'a> {
             let old_center = rooms[i].center();
 
             if rng.gen_range(0, 2) == 1 {
-                self.add_horizontal_tunnel(old_center.x, new_center.x, old_center.y);
-                self.add_vertical_tunnel(old_center.y, new_center.y, new_center.x);
+                self.add_horizontal_tunnel(old_center.0, new_center.0, old_center.1);
+                self.add_vertical_tunnel(old_center.1, new_center.1, new_center.0);
             } else {
-                self.add_vertical_tunnel(old_center.y, new_center.y, old_center.x);
-                self.add_horizontal_tunnel(old_center.x, new_center.x, new_center.y);
+                self.add_vertical_tunnel(old_center.1, new_center.1, old_center.0);
+                self.add_horizontal_tunnel(old_center.0, new_center.0, new_center.1);
             }
         }
 
@@ -69,21 +69,20 @@ impl<'a> RoomBuilder<'a> {
                 RectangleIteratorType::BODY => self.floor_tile
             };
 
-            let point = (point.x, point.y);
             // FIXME: This tile cloning is driving me mad
-            self.map.set(point, tile.clone());
+            self.map.set(&point, tile.clone());
         }
     }
 
     fn add_horizontal_tunnel(&mut self, start_x: usize, end_x: usize, y: usize) {
         for x in min(start_x, end_x) ..= max(start_x, end_x) {
-            self.map.set((x, y), self.floor_tile.clone());
+            self.map.set(&(x, y), self.floor_tile.clone());
         }
     }
 
     fn add_vertical_tunnel(&mut self, start_y: usize, end_y: usize, x: usize) {
         for y in min(start_y, end_y) ..= max(start_y, end_y) {
-            self.map.set((x, y), self.floor_tile.clone());
+            self.map.set(&(x, y), self.floor_tile.clone());
         }
     }
 }

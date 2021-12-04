@@ -4,7 +4,8 @@ use ndarray::{Array, Axis, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{Overlay, Tile};
+use crate::{math_is_hard, Overlay, Tile};
+
 
 
 pub struct Map {
@@ -77,17 +78,6 @@ const POINTS: [(isize, isize); 8] = [
     (1, 1)     // lower right
 ];
 
-#[inline]
-pub const fn math_is_hard(x: usize, d: isize) -> Option<usize> {
-    let result = x as isize + d;
-
-    if result.is_negative() {
-        None
-    } else {
-        Some(result as usize)
-    }
-}
-
 impl<'a> Iterator for CoordIterator<'a> {
     type Item = ((usize, usize), usize);
 
@@ -120,7 +110,7 @@ impl Map {
         }
     }
 
-    pub fn create_light_map(&self) -> Overlay<bool> {
+    pub fn create_overlay(&self) -> Overlay<bool> {
         Overlay::new(self.width, self.height, false)
     }
 
@@ -151,12 +141,12 @@ impl Map {
     }
 
     #[inline]
-    pub(crate) fn get(&self, loc: &(usize, usize)) -> Option<&Tile> {
+    pub fn get(&self, loc: &(usize, usize)) -> Option<&Tile> {
         self.map.get(*loc)
     }
 
     #[inline]
-    pub(crate) fn is_valid_loc(&self, loc: &(usize, usize)) -> bool {
+    pub fn is_valid_loc(&self, loc: &(usize, usize)) -> bool {
         loc.0 < self.width && loc.1 < self.height
     }
 

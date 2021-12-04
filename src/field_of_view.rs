@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn test_fov() {
         let mut map = Map::generate_ascii_map(FOV_MAP).unwrap();
-        let mut light_map = map.create_light_map();
+        let mut light_map = map.create_overlay();
         let visible = |tile: &Tile| tile.id == '.';
         calculate_field_of_view(&mut map, (7, 6), 20, &mut light_map, &visible);
 

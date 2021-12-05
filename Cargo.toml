@@ -11,6 +11,10 @@ rand = "0.7.3"
 name = "shortest_path"
 harness = false
 
+[[bench]]
+name = "field_of_view"
+harness = false
+
 [dependencies]
 nalgebra = "0.29.0"
 ndarray = "0.15.4"

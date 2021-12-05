@@ -14,10 +14,10 @@ const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
 // FIXME: probably want a more features FOV map which can be merged with actual map for at least debugging.
 
 // http://www.roguebasin.com/index.php/FOV_using_recursive_shadowcasting
-pub fn calculate_field_of_view(map: &mut Map, start: (usize, usize), radius: usize,
+pub fn calculate_field_of_view(map: &Map, start: &(usize, usize), radius: usize,
                                light_map: &mut Overlay<bool>, visible: &dyn Fn(&Tile) -> bool) {
     light_map.reset();
-    light_map.set(start, true);
+    light_map.set(*start, true);
 
     for multipliers in MULTIPLIERS {
         shadow_cast(1, 1.0, 0.0, multipliers, radius, start, light_map, map, visible);
@@ -25,7 +25,7 @@ pub fn calculate_field_of_view(map: &mut Map, start: (usize, usize), radius: usi
 }
 
 fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
-               radius: usize, start: (usize, usize), light_map: &mut Overlay<bool>, map: &Map,
+               radius: usize, start: &(usize, usize), light_map: &mut Overlay<bool>, map: &Map,
                visible: &dyn Fn(&Tile) -> bool) {
     if begin < end {
         return
@@ -122,7 +122,7 @@ mod tests {
         let mut map = Map::generate_ascii_map(FOV_MAP).unwrap();
         let mut light_map = map.create_overlay();
         let visible = |tile: &Tile| tile.id == '.';
-        calculate_field_of_view(&mut map, (7, 6), 20, &mut light_map, &visible);
+        calculate_field_of_view(&mut map, &(7, 6), 20, &mut light_map, &visible);
 
         let ascii = format!("{}", &light_map);
 

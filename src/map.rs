@@ -2,14 +2,14 @@ use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{math_is_hard, Overlay, Tile};
+use crate::{math_is_hard, Overlay};
 
 
 
 pub struct Map<T: Clone + PartialEq> {
     pub width: usize,
     pub height: usize,
-    map: Array<Tile<T>, Ix2>,
+    map: Array<T, Ix2>,
 }
 
 struct MapIterator<'a, T: Clone + PartialEq> {
@@ -27,7 +27,7 @@ impl<'a, T: Clone + PartialEq> MapIterator<'a, T> {
 }
 
 impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
-    type Item = ((usize, usize), &'a Tile<T>);
+    type Item = ((usize, usize), &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.map.map.len() {
@@ -50,11 +50,11 @@ struct CoordIterator<'a, T: Clone + PartialEq> {
     loc_y: usize,
     // Current index in POINTS
     index: usize,
-    available: &'a dyn Fn(&Tile<T>) -> bool
+    available: &'a dyn Fn(&T) -> bool
 }
 
 impl<'a, T: Clone + PartialEq> CoordIterator<'a, T> {
-    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&Tile<T>) -> bool + 'a)) -> Self {
+    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> bool + 'a)) -> Self {
         Self {
             map,
             loc_x: loc.0,
@@ -88,7 +88,7 @@ impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
                 if let Some(ny) = math_is_hard(self.loc_y, dy) {
                     if let Some(tile) = self.map.get(&(nx, ny)) {
                         if (self.available)(&tile) {
-                            return Some(((nx as usize, ny as usize), tile.weight))
+                            return Some(((nx as usize, ny as usize), 1))
                         }
                     }
                 }
@@ -114,11 +114,11 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
         return Err(())
     }
 
-    let mut map: Map<char> = Map::new(width, height, '.', 1);
+    let mut map: Map<char> = Map::new(width, height, '.');
 
     for (y, row) in rows.iter().enumerate() {
         for (x, tile) in row.chars().enumerate() {
-            map.set(&(x, y), Tile::new(tile, 1));
+            map.set(&(x, y), tile);
         }
     }
 
@@ -126,11 +126,11 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
 }
 
 impl<T: Clone + PartialEq> Map<T> {
-    pub fn new(width: usize, height: usize, default_char: T, default_weight: usize) -> Self {
+    pub fn new(width: usize, height: usize, default_char: T) -> Self {
         Self {
             width,
             height,
-            map: Array::<Tile<T>, Ix2>::from_elem((width, height), Tile::new(default_char, default_weight)),
+            map: Array::<T, Ix2>::from_elem((width, height), default_char),
         }
     }
 
@@ -141,7 +141,7 @@ impl<T: Clone + PartialEq> Map<T> {
 
 
     #[inline]
-    pub fn get(&self, loc: &(usize, usize)) -> Option<&Tile<T>> {
+    pub fn get(&self, loc: &(usize, usize)) -> Option<&T> {
         self.map.get(*loc)
     }
 
@@ -151,7 +151,7 @@ impl<T: Clone + PartialEq> Map<T> {
     }
 
     #[inline]
-    pub fn set(&mut self, loc: &(usize, usize), tile: Tile<T>) -> bool {
+    pub fn set(&mut self, loc: &(usize, usize), tile: T) -> bool {
         let spot = self.map.get_mut(*loc);
         let found = spot.is_some();
 
@@ -170,7 +170,7 @@ impl<T: Clone + PartialEq> Map<T> {
 
     // Assumes valid point
     #[inline]
-    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&Tile<T>) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
+    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
@@ -179,11 +179,11 @@ impl<T: Clone + PartialEq> Map<T> {
         absdiff(p1.0, p2.0) + absdiff(p1.1, p2.1)
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Tile<T>)> + 'a {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a T)> + 'a {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&Tile<T>) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
+    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&T) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
         astar(&start,
               |i| self.adjacent_ats(i, available),
               |i| Self::distance(i, end),
@@ -194,7 +194,7 @@ impl<T: Clone + PartialEq> Map<T> {
         loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
             let x = thread_rng().gen_range(0, self.width);
             let y = thread_rng().gen_range(0, self.height);
-            if self.map.get((x, y)).unwrap().id == tile_id {
+            if self.map.get((x, y)).unwrap() == &tile_id {
                 return (x, y)
             }
         }
@@ -214,13 +214,14 @@ impl<T: Clone + PartialEq> Display for Map<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Map, Tile};
+    use std::collections::{HashMap};
+    use crate::Map;
     use crate::map::generate_ascii_map;
 
     #[test]
     fn test_is_valid_loc() {
         let width = 5;
-        let map = Map::new(width, 10, '.', 1);
+        let map = Map::new(width, 10, '.');
 
         assert!(map.is_valid_loc(&(0, 0)));
         assert!(map.is_valid_loc(&(1, 0)));
@@ -232,7 +233,7 @@ mod tests {
     #[test]
     fn test_point_for() {
         let width = 5;
-        let map = Map::new(width, 10, '.', 1);
+        let map = Map::new(width, 10, '.');
 
         assert_eq!(map.point_for(0), (0, 0));
         assert_eq!(map.point_for(1), (1, 0));
@@ -242,19 +243,19 @@ mod tests {
     #[test]
     fn test_get_and_set() {
         let width = 5;
-        let mut map = Map::new(width, 10, '.', 1);
+        let mut map = Map::new(width, 10, '.');
 
         let loc = (0, 0);
-        assert_eq!(map.get(&loc).unwrap().id, '.');
-        map.set(&loc, Tile::new('=', 1));
-        assert_eq!(map.get(&loc).unwrap().id, '=');
+        assert_eq!(map.get(&loc).unwrap(), &'.');
+        map.set(&loc, '=');
+        assert_eq!(map.get(&loc).unwrap(), &'=');
     }
 
     #[test]
     fn test_adjacent_ats() {
         let width = 5;
-        let map = Map::new(width, 10, '.', 1);
-        let available = |tile: &Tile<char>| tile.id == '.';
+        let map = Map::new(width, 10, '.');
+        let available = |tile: &char| tile == &'.';
 
         //  +--
         //  |xo
@@ -305,13 +306,10 @@ mod tests {
 
 
         let mut map = generate_ascii_map(map_string).unwrap();
-        /*        assert_eq!(map.width, 14);
-                assert_eq!(map.height, 4);
-                assert_eq!(map.at(map.at_xy(0, 0).unwrap()), TileType::Wall);
-                assert_eq!(map.at(map.at_xy(1, 1).unwrap()), TileType::Floor);*/
-        //println!("{:?}", map);
-
-        let available = |tile: &Tile<char>| tile.id == '.';
+        let mut weights = HashMap::new();
+        weights.insert('.', 1);
+        // FIXME: tile is entity in ECS so we need nice mechanism for determining shortest path with other Component values?
+        let available = |tile: &char| { println!("WEIGHT: {}", weights.get(&'.').unwrap()); tile == &'.' };
         let path = map.shortest_path(&(1, 1), &(12, 1), &available);
         if let Some(path) = path {
             let (path, distance) = path;
@@ -319,8 +317,7 @@ mod tests {
             let route: Vec<_> = path.iter().collect();
             println!("Path {:?}", route);
             for i in &path {
-                let tile = Tile::new('x', 1);
-                map.set(i, tile);
+                map.set(i, 'x');
             }
           //  println!("{}", map);
         }
@@ -333,7 +330,7 @@ mod tests {
                                 ###";
         let map = generate_ascii_map(map_string).unwrap();
 
-        let string: String = map.iter().map(|(_, tile)| tile.id).collect();
+        let string: String = map.iter().map(|(_, tile)| tile).collect();
 
         assert_eq!(string, "123#.####");
     }

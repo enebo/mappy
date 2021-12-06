@@ -3,11 +3,9 @@ pub mod builders;
 mod field_of_view;
 mod overlay;
 mod map;
-mod tile;
 
 pub use map::Map;
 pub use overlay::Overlay;
-pub use tile::Tile;
 pub use field_of_view::calculate_field_of_view;
 
 #[derive(Debug)]

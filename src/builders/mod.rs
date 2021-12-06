@@ -2,17 +2,16 @@ use std::cmp::{max, min};
 use rand::{Rng, thread_rng};
 use crate::map::Map;
 use crate::rectangle::{Rectangle, RectangleIteratorType};
-use crate::tile::Tile;
 
 
 pub struct RoomBuilder<'a, T: Clone + PartialEq> {
     map: &'a mut Map<T>,
-    floor_tile: &'a Tile<T>,
-    wall_tile: &'a Tile<T>,
+    floor_tile: &'a T,
+    wall_tile: &'a T,
 }
 
 impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
-    pub fn new(map: &'a mut Map<T>, floor_tile: &'a Tile<T>, wall_tile: &'a Tile<T>) -> Self {
+    pub fn new(map: &'a mut Map<T>, floor_tile: &'a T, wall_tile: &'a T) -> Self {
         Self {
             map,
             floor_tile,

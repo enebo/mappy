@@ -1,4 +1,4 @@
-use mappy::{Map, Tile};
+use mappy::Map;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
@@ -6,7 +6,7 @@ pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
 
 fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
-    let mut map = Map::new(MAP_WIDTH, MAP_HEIGHT, '.', 1);
+    let mut map = Map::new(MAP_WIDTH, MAP_HEIGHT, '.');
     let mut rng = rand::thread_rng();
 
     // Add random walls
@@ -17,7 +17,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
             rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if &target != start && &target != end {
-            map.set(&target, Tile::new('#', 1));
+            map.set(&target, '#');
         }
     }
 
@@ -26,7 +26,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let (start, end) = ((1, MAP_HEIGHT - 1), (MAP_WIDTH - 3, MAP_HEIGHT - 1));
-    let available = |tile: &Tile<char>| tile.id == '.';
+    let available = |tile: &char| tile == &'.';
 
     c.bench_function("a_star_test_map", |b| {
         b.iter(|| {

@@ -50,11 +50,11 @@ struct CoordIterator<'a, T: Clone + PartialEq> {
     loc_y: usize,
     // Current index in POINTS
     index: usize,
-    available: &'a dyn Fn(&T) -> bool
+    available: &'a dyn Fn(&T) -> usize,
 }
 
 impl<'a, T: Clone + PartialEq> CoordIterator<'a, T> {
-    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> bool + 'a)) -> Self {
+    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> Self {
         Self {
             map,
             loc_x: loc.0,
@@ -87,8 +87,9 @@ impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
             if let Some(nx) = math_is_hard(self.loc_x, dx) {
                 if let Some(ny) = math_is_hard(self.loc_y, dy) {
                     if let Some(tile) = self.map.get(&(nx, ny)) {
-                        if (self.available)(&tile) {
-                            return Some(((nx as usize, ny as usize), 1))
+                        let weight = (self.available)(&tile);
+                        if weight != 0 {
+                            return Some(((nx as usize, ny as usize), weight))
                         }
                     }
                 }
@@ -170,7 +171,7 @@ impl<T: Clone + PartialEq> Map<T> {
 
     // Assumes valid point
     #[inline]
-    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
+    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
@@ -183,7 +184,7 @@ impl<T: Clone + PartialEq> Map<T> {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&T) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
+    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&T) -> usize) -> Option<(Vec<(usize, usize)>, usize)> {
         astar(&start,
               |i| self.adjacent_ats(i, available),
               |i| Self::distance(i, end),
@@ -255,7 +256,7 @@ mod tests {
     fn test_adjacent_ats() {
         let width = 5;
         let map = Map::new(width, 10, '.');
-        let available = |tile: &char| tile == &'.';
+        let available = |tile: &char| if tile == &'.' { 1 } else { 0 } ;
 
         //  +--
         //  |xo
@@ -307,9 +308,8 @@ mod tests {
 
         let mut map = generate_ascii_map(map_string).unwrap();
         let mut weights = HashMap::new();
-        weights.insert('.', 1);
-        // FIXME: tile is entity in ECS so we need nice mechanism for determining shortest path with other Component values?
-        let available = |tile: &char| { println!("WEIGHT: {}", weights.get(&'.').unwrap()); tile == &'.' };
+        weights.insert('.', 1 as usize);
+        let available = |tile: &char| *weights.get(tile).unwrap_or(&0);
         let path = map.shortest_path(&(1, 1), &(12, 1), &available);
         if let Some(path) = path {
             let (path, distance) = path;
@@ -319,7 +319,16 @@ mod tests {
             for i in &path {
                 map.set(i, 'x');
             }
-          //  println!("{}", map);
+
+            // FIXME: Add weighted test (use 123 as tiles which will just be their weight.
+            // FIXME: WOT!
+            for line in map.iter().map(|((_), tile)| *tile).collect::<Vec<char>>().chunks(map.width) {
+                for c in line {
+                    print!("{}", *c);
+                }
+                println!("");
+
+            }
         }
     }
 

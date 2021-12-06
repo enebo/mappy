@@ -26,7 +26,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let (start, end) = ((1, MAP_HEIGHT - 1), (MAP_WIDTH - 3, MAP_HEIGHT - 1));
-    let available = |tile: &char| tile == &'.';
+    let available = |tile: &char| if tile == &'.' { 1 } else { 0 };
 
     c.bench_function("a_star_test_map", |b| {
         b.iter(|| {

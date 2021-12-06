@@ -14,8 +14,8 @@ const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
 // FIXME: probably want a more features FOV map which can be merged with actual map for at least debugging.
 
 // http://www.roguebasin.com/index.php/FOV_using_recursive_shadowcasting
-pub fn calculate_field_of_view(map: &Map, start: &(usize, usize), radius: usize,
-                               light_map: &mut Overlay<bool>, visible: &dyn Fn(&Tile) -> bool) {
+pub fn calculate_field_of_view<T: Clone + PartialEq>(map: &Map<T>, start: &(usize, usize), radius: usize,
+                               light_map: &mut Overlay<bool>, visible: &dyn Fn(&Tile<T>) -> bool) {
     light_map.reset();
     light_map.set(*start, true);
 
@@ -24,9 +24,9 @@ pub fn calculate_field_of_view(map: &Map, start: &(usize, usize), radius: usize,
     }
 }
 
-fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
-               radius: usize, start: &(usize, usize), light_map: &mut Overlay<bool>, map: &Map,
-               visible: &dyn Fn(&Tile) -> bool) {
+fn shadow_cast<T: Clone + PartialEq>(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
+               radius: usize, start: &(usize, usize), light_map: &mut Overlay<bool>, map: &Map<T>,
+               visible: &dyn Fn(&Tile<T>) -> bool) {
     if begin < end {
         return
     }
@@ -98,8 +98,9 @@ fn shadow_cast(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize
 
 #[cfg(test)]
 mod tests {
-    use crate::{Map, Tile};
+    use crate::Tile;
     use crate::field_of_view::calculate_field_of_view;
+    use crate::map::generate_ascii_map;
 
     const FOV_MAP: &str = ".................\n\
                            .......###.......\n\
@@ -119,9 +120,9 @@ mod tests {
 
     #[test]
     fn test_fov() {
-        let mut map = Map::generate_ascii_map(FOV_MAP).unwrap();
+        let mut map = generate_ascii_map(FOV_MAP).unwrap();
         let mut light_map = map.create_overlay();
-        let visible = |tile: &Tile| tile.id == '.';
+        let visible = |tile: &Tile<char>| tile.id == '.';
         calculate_field_of_view(&mut map, &(7, 6), 20, &mut light_map, &visible);
 
         let ascii = format!("{}", &light_map);

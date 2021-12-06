@@ -1,12 +1,12 @@
 
 #[derive(Clone, Copy, Debug)]
-pub struct Tile {
-    pub id: char,
+pub struct Tile<T> {
+    pub id: T,
     pub(crate) weight: usize,
 }
 
-impl Tile {
-    pub fn new(id: char, weight: usize) -> Tile {
+impl<T> Tile<T> {
+    pub fn new(id: T, weight: usize) -> Self {
         Tile {
             id,
             weight,

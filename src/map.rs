@@ -1,6 +1,4 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use ndarray::{Array, Axis, Ix2};
+use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
@@ -8,19 +6,19 @@ use crate::{math_is_hard, Overlay, Tile};
 
 
 
-pub struct Map {
+pub struct Map<T: Clone + PartialEq> {
     pub width: usize,
     pub height: usize,
-    map: Array<Tile, Ix2>,
+    map: Array<Tile<T>, Ix2>,
 }
 
-struct MapIterator<'a> {
-    map: &'a Map,
+struct MapIterator<'a, T: Clone + PartialEq> {
+    map: &'a Map<T>,
     index: usize,
 }
 
-impl<'a> MapIterator<'a> {
-    fn new(map: &'a Map) -> Self {
+impl<'a, T: Clone + PartialEq> MapIterator<'a, T> {
+    fn new(map: &'a Map<T>) -> Self {
         Self {
             map,
             index: 0,
@@ -28,8 +26,8 @@ impl<'a> MapIterator<'a> {
     }
 }
 
-impl<'a> Iterator for MapIterator<'a> {
-    type Item = ((usize, usize), &'a Tile);
+impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
+    type Item = ((usize, usize), &'a Tile<T>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.map.map.len() {
@@ -46,17 +44,17 @@ impl<'a> Iterator for MapIterator<'a> {
 
 
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
-struct CoordIterator<'a> {
-    map: &'a Map,
+struct CoordIterator<'a, T: Clone + PartialEq> {
+    map: &'a Map<T>,
     loc_x: usize,
     loc_y: usize,
     // Current index in POINTS
     index: usize,
-    available: &'a dyn Fn(&Tile) -> bool
+    available: &'a dyn Fn(&Tile<T>) -> bool
 }
 
-impl<'a> CoordIterator<'a> {
-    fn new(map: &'a Map, loc: &(usize, usize), available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> Self {
+impl<'a, T: Clone + PartialEq> CoordIterator<'a, T> {
+    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&Tile<T>) -> bool + 'a)) -> Self {
         Self {
             map,
             loc_x: loc.0,
@@ -78,7 +76,7 @@ const POINTS: [(isize, isize); 8] = [
     (1, 1)     // lower right
 ];
 
-impl<'a> Iterator for CoordIterator<'a> {
+impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
     type Item = ((usize, usize), usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -101,12 +99,38 @@ impl<'a> Iterator for CoordIterator<'a> {
     }
 }
 
-impl Map {
-    pub fn new(width: usize, height: usize, default_char: char, default_weight: usize) -> Self {
+pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
+    let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
+    let height = rows.len();
+
+    if height == 0 {
+        return Err(())
+    }
+
+    let width = rows[0].len();
+
+    // verify all lines are same length;
+    if let Some(_) = rows.iter().find(|e| e.len() != width) {
+        return Err(())
+    }
+
+    let mut map: Map<char> = Map::new(width, height, '.', 1);
+
+    for (y, row) in rows.iter().enumerate() {
+        for (x, tile) in row.chars().enumerate() {
+            map.set(&(x, y), Tile::new(tile, 1));
+        }
+    }
+
+    Ok(map)
+}
+
+impl<T: Clone + PartialEq> Map<T> {
+    pub fn new(width: usize, height: usize, default_char: T, default_weight: usize) -> Self {
         Self {
             width,
             height,
-            map: Array::<Tile, Ix2>::from_elem((width, height), Tile::new(default_char, default_weight)),
+            map: Array::<Tile<T>, Ix2>::from_elem((width, height), Tile::new(default_char, default_weight)),
         }
     }
 
@@ -114,34 +138,10 @@ impl Map {
         Overlay::new(self.width, self.height, false)
     }
 
-    pub fn generate_ascii_map(ascii_map: &str) -> Result<Self, ()> {
-        let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
-        let height = rows.len();
 
-        if height == 0 {
-            return Err(())
-        }
-
-        let width = rows[0].len();
-
-        // verify all lines are same length;
-        if let Some(_) = rows.iter().find(|e| e.len() != width) {
-            return Err(())
-        }
-
-        let mut map = Map::new(width, height, '.', 1);
-
-        for (y, row) in rows.iter().enumerate() {
-            for (x, tile) in row.chars().enumerate() {
-                map.set(&(x, y), Tile::new(tile, 1));
-            }
-        }
-
-        Ok(map)
-    }
 
     #[inline]
-    pub fn get(&self, loc: &(usize, usize)) -> Option<&Tile> {
+    pub fn get(&self, loc: &(usize, usize)) -> Option<&Tile<T>> {
         self.map.get(*loc)
     }
 
@@ -151,7 +151,7 @@ impl Map {
     }
 
     #[inline]
-    pub fn set(&mut self, loc: &(usize, usize), tile: Tile) -> bool {
+    pub fn set(&mut self, loc: &(usize, usize), tile: Tile<T>) -> bool {
         let spot = self.map.get_mut(*loc);
         let found = spot.is_some();
 
@@ -170,7 +170,7 @@ impl Map {
 
     // Assumes valid point
     #[inline]
-    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&Tile) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
+    fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&Tile<T>) -> bool + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
         CoordIterator::new(self, loc, available)
     }
 
@@ -179,18 +179,18 @@ impl Map {
         absdiff(p1.0, p2.0) + absdiff(p1.1, p2.1)
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Tile)> + 'a {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Tile<T>)> + 'a {
         MapIterator::new(self)
     }
 
-    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&Tile) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
+    pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&Tile<T>) -> bool) -> Option<(Vec<(usize, usize)>, usize)> {
         astar(&start,
               |i| self.adjacent_ats(i, available),
               |i| Self::distance(i, end),
               |i| i == end)
     }
 
-    pub fn find_random_tile_loc(&self, tile_id: char) -> (usize, usize) {
+    pub fn find_random_tile_loc(&self, tile_id: T) -> (usize, usize) {
         loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
             let x = thread_rng().gen_range(0, self.width);
             let y = thread_rng().gen_range(0, self.height);
@@ -201,7 +201,8 @@ impl Map {
     }
 }
 
-impl Display for Map {
+/*
+impl<T: Clone + PartialEq> Display for Map<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for line in self.map.axis_iter(Axis(1)) {
             let line: String = line.iter().map(|tile| tile.id).collect();
@@ -209,11 +210,12 @@ impl Display for Map {
         }
         Ok(())
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {
     use crate::{Map, Tile};
+    use crate::map::generate_ascii_map;
 
     #[test]
     fn test_is_valid_loc() {
@@ -252,7 +254,7 @@ mod tests {
     fn test_adjacent_ats() {
         let width = 5;
         let map = Map::new(width, 10, '.', 1);
-        let available = |tile: &Tile| tile.id == '.';
+        let available = |tile: &Tile<char>| tile.id == '.';
 
         //  +--
         //  |xo
@@ -302,14 +304,14 @@ mod tests {
                                 ##############";
 
 
-        let mut map = Map::generate_ascii_map(map_string).unwrap();
+        let mut map = generate_ascii_map(map_string).unwrap();
         /*        assert_eq!(map.width, 14);
                 assert_eq!(map.height, 4);
                 assert_eq!(map.at(map.at_xy(0, 0).unwrap()), TileType::Wall);
                 assert_eq!(map.at(map.at_xy(1, 1).unwrap()), TileType::Floor);*/
-        println!("{}", map);
+        //println!("{:?}", map);
 
-        let available = |tile: &Tile| tile.id == '.';
+        let available = |tile: &Tile<char>| tile.id == '.';
         let path = map.shortest_path(&(1, 1), &(12, 1), &available);
         if let Some(path) = path {
             let (path, distance) = path;
@@ -320,7 +322,7 @@ mod tests {
                 let tile = Tile::new('x', 1);
                 map.set(i, tile);
             }
-            println!("{}", map);
+          //  println!("{}", map);
         }
     }
 
@@ -329,7 +331,7 @@ mod tests {
         let map_string = "123\n\
                                 #.#\n\
                                 ###";
-        let map = Map::generate_ascii_map(map_string).unwrap();
+        let map = generate_ascii_map(map_string).unwrap();
 
         let string: String = map.iter().map(|(_, tile)| tile.id).collect();
 

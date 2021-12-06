@@ -5,7 +5,7 @@ use mappy::{calculate_field_of_view, Map, Tile};
 pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
 
-fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map {
+fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
     let mut map = Map::new(MAP_WIDTH, MAP_HEIGHT, '.', 1);
     let mut rng = rand::thread_rng();
 
@@ -26,7 +26,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let (start, end) = ((1, MAP_HEIGHT - 1), (MAP_WIDTH - 3, MAP_HEIGHT - 1));
-    let visible = |tile: &Tile| tile.id == '.';
+    let visible = |tile: &Tile<char>| tile.id == '.';
 
     c.bench_function("field_of_view", |b| {
         b.iter(|| {

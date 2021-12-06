@@ -5,14 +5,14 @@ use crate::rectangle::{Rectangle, RectangleIteratorType};
 use crate::tile::Tile;
 
 
-pub struct RoomBuilder<'a> {
-    map: &'a mut Map,
-    floor_tile: &'a Tile,
-    wall_tile: &'a Tile,
+pub struct RoomBuilder<'a, T: Clone + PartialEq> {
+    map: &'a mut Map<T>,
+    floor_tile: &'a Tile<T>,
+    wall_tile: &'a Tile<T>,
 }
 
-impl<'a> RoomBuilder<'a> {
-    pub fn new(map: &'a mut Map, floor_tile: &'a Tile, wall_tile: &'a Tile) -> Self {
+impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
+    pub fn new(map: &'a mut Map<T>, floor_tile: &'a Tile<T>, wall_tile: &'a Tile<T>) -> Self {
         Self {
             map,
             floor_tile,

@@ -6,16 +6,16 @@ use crate::rectangle::{Rectangle, RectangleIteratorType};
 
 pub struct RoomBuilder<'a, T: Clone + PartialEq> {
     map: &'a mut Map<T>,
-    floor_tile: &'a T,
-    wall_tile: &'a T,
+    floor_fn: &'a dyn Fn() -> T,
+    wall_fn: &'a dyn Fn() -> T,
 }
 
 impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
-    pub fn new(map: &'a mut Map<T>, floor_tile: &'a T, wall_tile: &'a T) -> Self {
+    pub fn new(map: &'a mut Map<T>, floor_fn: &'a dyn Fn() -> T, wall_fn: &'a dyn Fn() -> T) -> Self {
         Self {
             map,
-            floor_tile,
-            wall_tile,
+            floor_fn,
+            wall_fn,
         }
     }
 
@@ -63,26 +63,39 @@ impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
 
     fn add_room(&mut self, rect: &Rectangle) {
         for (point, point_type) in rect.iter() {
-            let tile = match point_type {
-                RectangleIteratorType::BORDER => self.wall_tile,
-                RectangleIteratorType::BODY => self.floor_tile
+            let tile_fn = match point_type {
+                RectangleIteratorType::BORDER => self.wall_fn,
+                RectangleIteratorType::BODY => self.floor_fn
             };
 
             // FIXME: This tile cloning is driving me mad
-            self.map.set(&point, tile.clone());
+            self.map.set(&point, tile_fn());
         }
     }
 
     fn add_horizontal_tunnel(&mut self, start_x: usize, end_x: usize, y: usize) {
         for x in min(start_x, end_x) ..= max(start_x, end_x) {
-            self.map.set(&(x, y), self.floor_tile.clone());
+            self.map.set(&(x, y), (self.floor_fn)());
         }
     }
 
     fn add_vertical_tunnel(&mut self, start_y: usize, end_y: usize, x: usize) {
         for y in min(start_y, end_y) ..= max(start_y, end_y) {
-            self.map.set(&(x, y), self.floor_tile.clone());
+            self.map.set(&(x, y), (self.floor_fn)());
         }
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::builders::RoomBuilder;
+    use crate::Map;
+
+    #[test]
+    fn test_runs() {
+        let mut map = Map::new(50, 50, &|| '#');
+        let mut builder = RoomBuilder::new(&mut map, &|| '.', &|| '#');
+
+        builder.create(7, 4, 10).unwrap();
+    }
+}

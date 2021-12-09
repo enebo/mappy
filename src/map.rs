@@ -192,12 +192,13 @@ impl<T: Clone + PartialEq> Map<T> {
               |i| i == end)
     }
 
-    pub fn find_random_tile_loc(&self, tile_id: T) -> (usize, usize) {
+    pub fn find_random_tile_loc(&self, available: &dyn Fn(&T) -> bool) -> (usize, usize) {
         loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
-            let x = thread_rng().gen_range(0, self.width);
-            let y = thread_rng().gen_range(0, self.height);
-            if self.map.get((x, y)).unwrap() == &tile_id {
-                return (x, y)
+            let loc = (thread_rng().gen_range(0, self.width),
+                       thread_rng().gen_range(0, self.height));
+
+            if (available)(self.map.get(loc).unwrap()) {
+                return loc
             }
         }
     }

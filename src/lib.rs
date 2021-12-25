@@ -2,7 +2,7 @@ pub mod rectangle;
 pub mod builders;
 mod field_of_view;
 mod overlay;
-mod map;
+pub mod map;
 
 pub use map::Map;
 pub use overlay::Overlay;

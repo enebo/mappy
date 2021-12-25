@@ -115,7 +115,7 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
         return Err(())
     }
 
-    let default_fn = || '.';
+    let default_fn = |_| '.';
     let mut map: Map<char> = Map::new(width, height, &default_fn);
 
     for (y, row) in rows.iter().enumerate() {
@@ -128,19 +128,17 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
 }
 
 impl<T: Clone + PartialEq> Map<T> {
-    pub fn new(width: usize, height: usize, default_fn: &dyn Fn() -> T) -> Self {
+    pub fn new(width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
         Self {
             width,
             height,
-            map: Array::<T, Ix2>::from_shape_simple_fn((width, height), default_fn),
+            map: Array::<T, Ix2>::from_shape_fn((width, height), default_fn),
         }
     }
 
     pub fn create_overlay(&self) -> Overlay<bool> {
         Overlay::new(self.width, self.height, false)
     }
-
-
 
     #[inline]
     pub fn get(&self, loc: &(usize, usize)) -> Option<&T> {
@@ -197,7 +195,7 @@ impl<T: Clone + PartialEq> Map<T> {
             let loc = (thread_rng().gen_range(0, self.width),
                        thread_rng().gen_range(0, self.height));
 
-            if (available)(self.map.get(loc).unwrap()) {
+            if (available)(&self.map.get(loc).unwrap()) {
                 return loc
             }
         }
@@ -224,7 +222,7 @@ mod tests {
     #[test]
     fn test_is_valid_loc() {
         let width = 5;
-        let map = Map::new(width, 10, &|| '.');
+        let map = Map::new(width, 10, &|_| '.');
 
         assert!(map.is_valid_loc(&(0, 0)));
         assert!(map.is_valid_loc(&(1, 0)));
@@ -236,7 +234,7 @@ mod tests {
     #[test]
     fn test_point_for() {
         let width = 5;
-        let map = Map::new(width, 10, &|| '.');
+        let map = Map::new(width, 10, &|_| '.');
 
         assert_eq!(map.point_for(0), (0, 0));
         assert_eq!(map.point_for(1), (1, 0));
@@ -246,7 +244,7 @@ mod tests {
     #[test]
     fn test_get_and_set() {
         let width = 5;
-        let mut map = Map::new(width, 10, &|| '.');
+        let mut map = Map::new(width, 10, &|_| '.');
 
         let loc = (0, 0);
         assert_eq!(map.get(&loc).unwrap(), &'.');
@@ -257,7 +255,7 @@ mod tests {
     #[test]
     fn test_adjacent_ats() {
         let width = 5;
-        let map = Map::new(width, 10, &|| '.');
+        let map = Map::new(width, 10, &|_| '.');
         let available = |tile: &char| if tile == &'.' { 1 } else { 0 } ;
 
         //  +--

@@ -6,12 +6,12 @@ use crate::rectangle::{Rectangle, RectangleIteratorType};
 
 pub struct RoomBuilder<'a, T: Clone + PartialEq> {
     map: &'a mut Map<T>,
-    floor_fn: &'a dyn Fn() -> T,
-    wall_fn: &'a dyn Fn() -> T,
+    floor_fn: &'a dyn Fn((usize, usize)) -> T,
+    wall_fn: &'a dyn Fn((usize, usize)) -> T,
 }
 
 impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
-    pub fn new(map: &'a mut Map<T>, floor_fn: &'a dyn Fn() -> T, wall_fn: &'a dyn Fn() -> T) -> Self {
+    pub fn new(map: &'a mut Map<T>, floor_fn: &'a dyn Fn((usize, usize)) -> T, wall_fn: &'a dyn Fn((usize, usize)) -> T) -> Self {
         Self {
             map,
             floor_fn,
@@ -69,19 +69,21 @@ impl<'a, T: Clone + PartialEq> RoomBuilder<'a, T> {
             };
 
             // FIXME: This tile cloning is driving me mad
-            self.map.set(&point, tile_fn());
+            self.map.set(&point, tile_fn(point));
         }
     }
 
     fn add_horizontal_tunnel(&mut self, start_x: usize, end_x: usize, y: usize) {
         for x in min(start_x, end_x) ..= max(start_x, end_x) {
-            self.map.set(&(x, y), (self.floor_fn)());
+            let loc = (x, y);
+            self.map.set(&loc, (self.floor_fn)(loc));
         }
     }
 
     fn add_vertical_tunnel(&mut self, start_y: usize, end_y: usize, x: usize) {
         for y in min(start_y, end_y) ..= max(start_y, end_y) {
-            self.map.set(&(x, y), (self.floor_fn)());
+            let loc = (x, y);
+            self.map.set(&loc, (self.floor_fn)(loc));
         }
     }
 }
@@ -93,8 +95,8 @@ mod tests {
 
     #[test]
     fn test_runs() {
-        let mut map = Map::new(50, 50, &|| '#');
-        let mut builder = RoomBuilder::new(&mut map, &|| '.', &|| '#');
+        let mut map = Map::new(50, 50, &|_| '#');
+        let mut builder = RoomBuilder::new(&mut map, &|_| '.', &|_| '#');
 
         builder.create(7, 4, 10).unwrap();
     }

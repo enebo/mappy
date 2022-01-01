@@ -6,7 +6,7 @@ pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
 
 fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
-    let mut map = Map::new(MAP_WIDTH, MAP_HEIGHT, &|_| '.');
+    let mut map = Map::new("map", MAP_WIDTH, MAP_HEIGHT, &|_| '.');
     let mut rng = rand::thread_rng();
 
     // Add random walls

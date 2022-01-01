@@ -7,6 +7,7 @@ use crate::{math_is_hard, Overlay};
 
 
 pub struct Map<T: Clone + PartialEq> {
+    pub name: String,
     pub width: usize,
     pub height: usize,
     map: Array<T, Ix2>,
@@ -100,7 +101,7 @@ impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
     }
 }
 
-pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
+pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<Map<char>, ()> {
     let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
     let height = rows.len();
 
@@ -116,7 +117,8 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
     }
 
     let default_fn = |_| '.';
-    let mut map: Map<char> = Map::new(width, height, &default_fn);
+    let mut map: Map<char> = Map::new(name.into(), width, height, &default_fn);
+
 
     for (y, row) in rows.iter().enumerate() {
         for (x, tile) in row.chars().enumerate() {
@@ -128,8 +130,9 @@ pub fn generate_ascii_map(ascii_map: &str) -> Result<Map<char>, ()> {
 }
 
 impl<T: Clone + PartialEq> Map<T> {
-    pub fn new(width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
+    pub fn new<S: Into<String>>(name: S, width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
         Self {
+            name: name.into(),
             width,
             height,
             map: Array::<T, Ix2>::from_shape_fn((width, height), default_fn),
@@ -222,7 +225,7 @@ mod tests {
     #[test]
     fn test_is_valid_loc() {
         let width = 5;
-        let map = Map::new(width, 10, &|_| '.');
+        let map = Map::new("map", width, 10, &|_| '.');
 
         assert!(map.is_valid_loc(&(0, 0)));
         assert!(map.is_valid_loc(&(1, 0)));
@@ -234,7 +237,7 @@ mod tests {
     #[test]
     fn test_point_for() {
         let width = 5;
-        let map = Map::new(width, 10, &|_| '.');
+        let map = Map::new("map", width, 10, &|_| '.');
 
         assert_eq!(map.point_for(0), (0, 0));
         assert_eq!(map.point_for(1), (1, 0));
@@ -244,7 +247,7 @@ mod tests {
     #[test]
     fn test_get_and_set() {
         let width = 5;
-        let mut map = Map::new(width, 10, &|_| '.');
+        let mut map = Map::new("map", width, 10, &|_| '.');
 
         let loc = (0, 0);
         assert_eq!(map.get(&loc).unwrap(), &'.');
@@ -255,7 +258,7 @@ mod tests {
     #[test]
     fn test_adjacent_ats() {
         let width = 5;
-        let map = Map::new(width, 10, &|_| '.');
+        let map = Map::new("map", width, 10, &|_| '.');
         let available = |tile: &char| if tile == &'.' { 1 } else { 0 } ;
 
         //  +--
@@ -306,7 +309,7 @@ mod tests {
                                 ##############";
 
 
-        let mut map = generate_ascii_map(map_string).unwrap();
+        let mut map = generate_ascii_map("map", map_string).unwrap();
         let mut weights = HashMap::new();
         weights.insert('.', 1 as usize);
         let available = |tile: &char| *weights.get(tile).unwrap_or(&0);
@@ -337,7 +340,7 @@ mod tests {
         let map_string = "123\n\
                                 #.#\n\
                                 ###";
-        let map = generate_ascii_map(map_string).unwrap();
+        let map = generate_ascii_map("map", map_string).unwrap();
 
         let string: String = map.iter().map(|(_, tile)| tile).collect();
 

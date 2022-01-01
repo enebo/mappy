@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_runs() {
-        let mut map = Map::new(50, 50, &|_| '#');
+        let mut map = Map::new("map", 50, 50, &|_| '#');
         let mut builder = RoomBuilder::new(&mut map, &|_| '.', &|_| '#');
 
         builder.create(7, 4, 10).unwrap();

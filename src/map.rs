@@ -2,7 +2,7 @@ use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{math_is_hard, Overlay};
+use crate::{add_delta, Overlay};
 
 
 
@@ -47,8 +47,7 @@ impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
 struct CoordIterator<'a, T: Clone + PartialEq> {
     map: &'a Map<T>,
-    loc_x: usize,
-    loc_y: usize,
+    loc: (usize, usize),
     // Current index in POINTS
     index: usize,
     available: &'a dyn Fn(&T) -> usize,
@@ -58,8 +57,7 @@ impl<'a, T: Clone + PartialEq> CoordIterator<'a, T> {
     fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> Self {
         Self {
             map,
-            loc_x: loc.0,
-            loc_y: loc.1,
+            loc: *loc,
             index: 0,
             available
         }
@@ -82,16 +80,14 @@ impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.index < POINTS.len() {
-            let (dx, dy) = POINTS[self.index];
+            let delta = POINTS[self.index];
             self.index += 1;
 
-            if let Some(nx) = math_is_hard(self.loc_x, dx) {
-                if let Some(ny) = math_is_hard(self.loc_y, dy) {
-                    if let Some(tile) = self.map.get(&(nx, ny)) {
-                        let weight = (self.available)(&tile);
-                        if weight != 0 {
-                            return Some(((nx as usize, ny as usize), weight))
-                        }
+            if let Some(loc) = add_delta(&self.loc, &delta) {
+                if let Some(tile) = self.map.get(&loc) {
+                    let weight = (self.available)(&tile);
+                    if weight != 0 {
+                        return Some((loc, weight))
                     }
                 }
             }

@@ -184,6 +184,34 @@ impl<T: Clone + PartialEq> Map<T> {
         MapIterator::new(self)
     }
 
+    /// Search all paths around the current loc and return bit pattern representing all the
+    /// matching locations.  The bit pattern itself is 3 bits per line and will contain a 1
+    /// if there is an adjacent matching loc (test fn returns true).  For example:
+    ///
+    /// ###
+    /// # #
+    /// ###
+    ///
+    /// (0,0) -> 0b_000_001_010
+    /// (1,0) -> 0b_000_101_000
+    /// (2,0) -> 0b_000_100_010
+    ///
+    /// For sprites in a game you may use this function to exclude diagonals to get the limited
+    /// number of sprites for representing a fence where adjacent other fence types should connect
+    /// together.
+    ///
+    /// For combat you could use this to look for adjacent monsters?
+    pub fn adjacent_paths(&self, loc: &(usize, usize), test: &dyn Fn(&T) -> bool, include_diagonals: bool) -> usize {
+        let iter = CoordIterator::new(self, loc, &test, false);
+
+        iter
+            .filter(|(_, valid)| *valid)
+            .map(|((x, y), _)| (x as isize - loc.0 as isize, y as isize - loc.1 as isize))
+            .filter(|(dx, dy)| include_diagonals || *dx == 0 || *dy == 0)
+            .map(|(dx, dy)| 1 << ((dx*-1 + 1) + ((dy*-1 + 1) * 3)))
+            .fold(0, |result, bits| result | bits)
+    }
+
     pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&T) -> usize) -> Option<(Vec<(usize, usize)>, usize)> {
         astar(&start,
               |i| self.adjacent_ats(i, available),
@@ -297,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_adjacent_counts() {
+    fn test_adjacent_paths() {
         let map_string = "##############\n\
                           #..#......#..#\n\
                           #..###.#.....#\n\
@@ -305,7 +333,27 @@ mod tests {
                           #..######.#..#\n\
                           #............#\n\
                           ##############";
-        let mut map = generate_ascii_map("map", map_string).unwrap();
+        let map = generate_ascii_map("map", map_string).unwrap();
+
+        let mut pattern = map.adjacent_paths(&(0, 0), &|c| *c == '#', false);
+        println!("Upper left corner");
+        println!("Pattern: {:03b}", ((pattern >> 6) & 7));
+        println!("Pattern: {:03b}", ((pattern >> 3) & 7));
+        println!("Pattern: {:03b}", (pattern & 7));
+        assert_eq!(pattern, 0b_000_001_010);
+        pattern = map.adjacent_paths(&(13, 0), &|c| *c == '#', false);
+        println!("Upper right corner");
+        println!("Pattern: {:03b}", ((pattern >> 6) & 7));
+        println!("Pattern: {:03b}", ((pattern >> 3) & 7));
+        println!("Pattern: {:03b}", (pattern & 7));
+        assert_eq!(pattern, 0b_000_100_010);
+        pattern = map.adjacent_paths(&(4, 3), &|c| *c == '#', true);
+        println!("Surrounded");
+        println!("Pattern: {:03b}", ((pattern >> 6) & 7));
+        println!("Pattern: {:03b}", ((pattern >> 3) & 7));
+        println!("Pattern: {:03b}", (pattern & 7));
+        assert_eq!(pattern, 0b_111_101_111);
+
     }
 
     #[test]

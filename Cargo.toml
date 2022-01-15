@@ -15,6 +15,10 @@ harness = false
 name = "field_of_view"
 harness = false
 
+[[bench]]
+name = "adjacent_paths"
+harness = false
+
 [dependencies]
 nalgebra = "0.29.0"
 ndarray = "0.15.4"

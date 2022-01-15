@@ -52,16 +52,18 @@ struct CoordIterator<'a, T: Clone + PartialEq, U: PartialEq> {
     index: usize,
     available: &'a dyn Fn(&T) -> U,
     invalid: U,
+    include_diagonals: bool,
 }
 
 impl<'a, T: Clone + PartialEq, U: PartialEq> CoordIterator<'a, T, U> {
-    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U) -> Self {
+    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U, include_diagonals: bool) -> Self {
         Self {
             map,
             loc: *loc,
             index: 0,
             available,
-            invalid
+            invalid,
+            include_diagonals,
         }
     }
 }
@@ -77,22 +79,46 @@ const POINTS: [(isize, isize); 8] = [
     (1, 1)     // lower right
 ];
 
+const SIMPLE_POINTS: [(isize, isize); 4] = [
+    (0, -1),   // up
+    (-1, 0),   // left
+    (1, 0),    // right
+    (0, 1),    // down
+];
+
 impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
     type Item = ((usize, usize), U);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.index < POINTS.len() {
-            let delta = POINTS[self.index];
-            self.index += 1;
+        if self.include_diagonals {
+            while self.index < POINTS.len() {
+                let delta = POINTS[self.index];
+                self.index += 1;
 
-            if let Some(loc) = add_delta(&self.loc, &delta) {
-                if let Some(tile) = self.map.get(&loc) {
-                    let test = (self.available)(&tile);
-                    if test != self.invalid {
-                        return Some((loc, test))
+                if let Some(loc) = add_delta(&self.loc, &delta) {
+                    if let Some(tile) = self.map.get(&loc) {
+                        let test = (self.available)(&tile);
+                        if test != self.invalid {
+                            return Some((loc, test))
+                        }
                     }
                 }
             }
+        } else {
+            while self.index < SIMPLE_POINTS.len() {
+                let delta = SIMPLE_POINTS[self.index];
+                self.index += 1;
+
+                if let Some(loc) = add_delta(&self.loc, &delta) {
+                    if let Some(tile) = self.map.get(&loc) {
+                        let test = (self.available)(&tile);
+                        if test != self.invalid {
+                            return Some((loc, test))
+                        }
+                    }
+                }
+            }
+
         }
 
         None
@@ -172,7 +198,7 @@ impl<T: Clone + PartialEq> Map<T> {
     // Assumes valid point
     #[inline]
     fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
-        CoordIterator::new(self, loc, available, 0)
+        CoordIterator::new(self, loc, available, 0, true)
     }
 
     #[inline]
@@ -202,14 +228,16 @@ impl<T: Clone + PartialEq> Map<T> {
     ///
     /// For combat you could use this to look for adjacent monsters?
     pub fn adjacent_paths(&self, loc: &(usize, usize), test: &dyn Fn(&T) -> bool, include_diagonals: bool) -> usize {
-        let iter = CoordIterator::new(self, loc, &test, false);
+        let iter = CoordIterator::new(self, loc, &test, false, include_diagonals);
 
-        iter
-            .filter(|(_, valid)| *valid)
-            .map(|((x, y), _)| (x as isize - loc.0 as isize, y as isize - loc.1 as isize))
-            .filter(|(dx, dy)| include_diagonals || *dx == 0 || *dy == 0)
-            .map(|(dx, dy)| 1 << ((dx*-1 + 1) + ((dy*-1 + 1) * 3)))
-            .fold(0, |result, bits| result | bits)
+        let mut result = 0;
+        for ((x, y), _) in iter {
+            let (dx, dy) = (x as isize - loc.0 as isize, y as isize - loc.1 as isize);
+            let bits = 1 << ((dx*-1 + 1) + ((dy*-1 + 1) * 3));
+
+            result = result | bits
+        }
+        result
     }
 
     pub fn shortest_path(&self, start: &(usize, usize), end: &(usize, usize), available: &dyn Fn(&T) -> usize) -> Option<(Vec<(usize, usize)>, usize)> {

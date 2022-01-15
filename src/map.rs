@@ -89,6 +89,7 @@ const SIMPLE_POINTS: [(isize, isize); 4] = [
 impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
     type Item = ((usize, usize), U);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.include_diagonals {
             while self.index < POINTS.len() {

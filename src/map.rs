@@ -45,21 +45,23 @@ impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
 
 
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
-struct CoordIterator<'a, T: Clone + PartialEq> {
+struct CoordIterator<'a, T: Clone + PartialEq, U: PartialEq> {
     map: &'a Map<T>,
     loc: (usize, usize),
     // Current index in POINTS
     index: usize,
-    available: &'a dyn Fn(&T) -> usize,
+    available: &'a dyn Fn(&T) -> U,
+    invalid: U,
 }
 
-impl<'a, T: Clone + PartialEq> CoordIterator<'a, T> {
-    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> Self {
+impl<'a, T: Clone + PartialEq, U: PartialEq> CoordIterator<'a, T, U> {
+    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U) -> Self {
         Self {
             map,
             loc: *loc,
             index: 0,
-            available
+            available,
+            invalid
         }
     }
 }
@@ -75,8 +77,8 @@ const POINTS: [(isize, isize); 8] = [
     (1, 1)     // lower right
 ];
 
-impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
-    type Item = ((usize, usize), usize);
+impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
+    type Item = ((usize, usize), U);
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.index < POINTS.len() {
@@ -85,9 +87,9 @@ impl<'a, T: Clone + PartialEq> Iterator for CoordIterator<'a, T> {
 
             if let Some(loc) = add_delta(&self.loc, &delta) {
                 if let Some(tile) = self.map.get(&loc) {
-                    let weight = (self.available)(&tile);
-                    if weight != 0 {
-                        return Some((loc, weight))
+                    let test = (self.available)(&tile);
+                    if test != self.invalid {
+                        return Some((loc, test))
                     }
                 }
             }
@@ -170,7 +172,7 @@ impl<T: Clone + PartialEq> Map<T> {
     // Assumes valid point
     #[inline]
     fn adjacent_ats<'a>(&'a self, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> usize + 'a)) -> impl Iterator<Item=((usize, usize), usize)> + 'a {
-        CoordIterator::new(self, loc, available)
+        CoordIterator::new(self, loc, available, 0)
     }
 
     #[inline]
@@ -292,6 +294,18 @@ mod tests {
         let ats = map.adjacent_ats(&(4, 9), &available);
         let ats: Vec<(usize, usize)> = ats.map(|(loc, _)| loc ).collect();
         assert_eq!(ats, vec![(3, 8), (4, 8), (3, 9)]);
+    }
+
+    #[test]
+    fn test_adjacent_counts() {
+        let map_string = "##############\n\
+                          #..#......#..#\n\
+                          #..###.#.....#\n\
+                          #..###..#.#..#\n\
+                          #..######.#..#\n\
+                          #............#\n\
+                          ##############";
+        let mut map = generate_ascii_map("map", map_string).unwrap();
     }
 
     #[test]

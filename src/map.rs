@@ -6,7 +6,7 @@ use crate::{add_delta, Overlay};
 use crate::rectangle::Rectangle;
 
 
-pub struct Map<T: Clone + PartialEq> {
+pub struct Map<T: PartialEq> {
     pub name: String,
     pub width: usize,
     pub height: usize,
@@ -15,12 +15,12 @@ pub struct Map<T: Clone + PartialEq> {
     map: Array<T, Ix2>,
 }
 
-struct MapIterator<'a, T: Clone + PartialEq> {
+struct MapIterator<'a, T: PartialEq> {
     map: &'a Map<T>,
     index: usize,
 }
 
-impl<'a, T: Clone + PartialEq> MapIterator<'a, T> {
+impl<'a, T: PartialEq> MapIterator<'a, T> {
     fn new(map: &'a Map<T>) -> Self {
         Self {
             map,
@@ -29,7 +29,7 @@ impl<'a, T: Clone + PartialEq> MapIterator<'a, T> {
     }
 }
 
-impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
+impl<'a, T: PartialEq> Iterator for MapIterator<'a, T> {
     type Item = ((usize, usize), &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -47,7 +47,7 @@ impl<'a, T: Clone + PartialEq> Iterator for MapIterator<'a, T> {
 
 
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
-struct CoordIterator<'a, T: Clone + PartialEq, U: PartialEq> {
+struct CoordIterator<'a, T: PartialEq, U: PartialEq> {
     map: &'a Map<T>,
     loc: (usize, usize),
     // Current index in POINTS
@@ -57,7 +57,7 @@ struct CoordIterator<'a, T: Clone + PartialEq, U: PartialEq> {
     include_diagonals: bool,
 }
 
-impl<'a, T: Clone + PartialEq, U: PartialEq> CoordIterator<'a, T, U> {
+impl<'a, T: PartialEq, U: PartialEq> CoordIterator<'a, T, U> {
     fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U, include_diagonals: bool) -> Self {
         Self {
             map,
@@ -88,7 +88,7 @@ const SIMPLE_POINTS: [(isize, isize); 4] = [
     (0, 1),    // down
 ];
 
-impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
+impl<'a, T: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
     type Item = ((usize, usize), U);
 
     #[inline]
@@ -158,7 +158,7 @@ pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<M
     Ok(map)
 }
 
-impl<T: Clone + PartialEq> Map<T> {
+impl<T: PartialEq> Map<T> {
     pub fn new<S: Into<String>>(name: S, width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
         Self {
             name: name.into(),

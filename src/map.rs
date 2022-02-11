@@ -3,13 +3,15 @@ use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
 use crate::{add_delta, Overlay};
-
+use crate::rectangle::Rectangle;
 
 
 pub struct Map<T: Clone + PartialEq> {
     pub name: String,
     pub width: usize,
     pub height: usize,
+    // FIXME: A trait for different shape rooms is desired here but until I understand what the needs are we will use one struct
+    pub rooms: Vec<Rectangle>,
     map: Array<T, Ix2>,
 }
 
@@ -92,6 +94,7 @@ impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.include_diagonals {
+            assert!(POINTS.len() >= 8);
             while self.index < POINTS.len() {
                 let delta = POINTS[self.index];
                 self.index += 1;
@@ -106,6 +109,7 @@ impl<'a, T: Clone + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U
                 }
             }
         } else {
+            assert!(POINTS.len() >= 4);
             while self.index < SIMPLE_POINTS.len() {
                 let delta = SIMPLE_POINTS[self.index];
                 self.index += 1;
@@ -160,8 +164,13 @@ impl<T: Clone + PartialEq> Map<T> {
             name: name.into(),
             width,
             height,
+            rooms: vec![],
             map: Array::<T, Ix2>::from_shape_fn((width, height), default_fn),
         }
+    }
+
+    pub fn add_room(&mut self, rect: Rectangle) {
+        self.rooms.push(rect);
     }
 
     pub fn create_overlay(&self) -> Overlay<bool> {
@@ -248,15 +257,19 @@ impl<T: Clone + PartialEq> Map<T> {
               |i| i == end)
     }
 
-    pub fn find_random_tile_loc(&self, available: &dyn Fn(&T) -> bool) -> (usize, usize) {
-        loop { // FIXME: This is a really scary method since it is non-deterministic and not even guaranteed to have an answer.
-            let loc = (thread_rng().gen_range(0, self.width),
-                       thread_rng().gen_range(0, self.height));
+    pub fn find_random_tile_loc(&self, available: &dyn Fn(&T) -> bool) -> Result<(usize, usize), ()> {
+        let room_count = self.rooms.len();
+        let room_index = thread_rng().gen_range(0, room_count);
+        let room = self.rooms.get(room_index).unwrap();
 
+        for _ in 0..100 {
+            let loc = (room.random_x(false), room.random_y(false));
             if (available)(&self.map.get(loc).unwrap()) {
-                return loc
+                return Ok(loc)
             }
         }
+
+        Err(())
     }
 }
 
@@ -276,6 +289,20 @@ mod tests {
     use std::collections::{HashMap};
     use crate::Map;
     use crate::map::generate_ascii_map;
+    use crate::rectangle::Rectangle;
+
+    #[test]
+    fn test_random_tile_loc() {
+        //  +-+
+        //  |.|
+        //  +-+
+        let mut map = Map::new("map", 3, 3, &|_| '.');
+        let room = Rectangle::new(0, 0, 3, 3).unwrap();
+        map.add_room(room);
+        assert!(map.find_random_tile_loc(&|c| *c == '.').is_ok());
+
+        assert!(map.find_random_tile_loc(&|c| *c != '.').is_err());
+    }
 
     #[test]
     fn test_is_valid_loc() {

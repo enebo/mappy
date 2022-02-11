@@ -34,16 +34,34 @@ impl Rectangle {
         RectangleIterator::new(self)
     }
 
-    pub fn random_x(&self) -> usize {
+    /// Give us a random valid x coordinate in/on this rectangle.
+    /// If include_wall is true it will include the edges as a valid x
+    /// value.  If not it will only be the body of the rectangle.
+    pub fn random_x(&self, include_wall: bool) -> usize {
         let mut rng = thread_rng();
 
-        self.ulc.0 + rng.gen_range(0, self.lrc.0 - self.ulc.0)
+        let (start, end) = if include_wall {
+            (0, self.lrc.0 - self.ulc.0)
+        } else {
+            (1, self.lrc.0 - self.ulc.0 - 1)
+        };
+
+        self.ulc.0 + rng.gen_range(start, end)
     }
 
-    pub fn random_y(&self) -> usize {
+    /// Give us a random valid x coordinate in/on this rectangle.
+    /// If include_wall is true it will include the edges as a valid y
+    /// value.  If not it will only be the body of the rectangle.
+    pub fn random_y(&self, include_wall: bool) -> usize {
         let mut rng = thread_rng();
 
-        self.ulc.1 + rng.gen_range(0, self.lrc.1 - self.ulc.1)
+        let (start, end) = if include_wall {
+            (0, self.lrc.1 - self.ulc.1)
+        } else {
+            (1, self.lrc.1 - self.ulc.1 - 1)
+        };
+
+        self.ulc.1 + rng.gen_range(start, end)
     }
 }
 
@@ -158,19 +176,31 @@ mod tests {
 
     #[test]
     fn test_rand_x() {
-        let rect = Rectangle::new(1, 1, 3, 3).unwrap();
+        //   012345
+        // 0 .......
+        // 1 .####..
+        // 2 .#..#..
+        // 3 .####..
+        let rect = Rectangle::new(1, 1, 4, 3).unwrap();
 
-        let x = rect.random_x();
-
-        assert!(x >= 1 && x < 4);
+        let mut x = rect.random_x(true);
+        assert!(x >= 1 && x < 5);
+        x = rect.random_x(false);
+        assert!(x > 1 && x < 4);
     }
 
     #[test]
     fn test_rand_y() {
-        let rect = Rectangle::new(1, 1, 3, 3).unwrap();
+        //   012345
+        // 0 .......
+        // 1 .####..
+        // 2 .#..#..
+        // 3 .####..
+        let rect = Rectangle::new(1, 1, 4, 3).unwrap();
 
-        let y = rect.random_y();
-
-        assert!(y >= 1 && y < 4);
+        let mut y = rect.random_y(true);
+        assert!(y >= 1 && y < 5);
+        y = rect.random_y(false);
+        assert!(y > 1 && y < 4);
     }
 }

@@ -3,9 +3,14 @@ pub mod builders;
 mod field_of_view;
 mod overlay;
 pub mod map;
+pub mod spot;
+pub mod cardinality;
 
+pub use cardinality::Cardinality;
 pub use map::Map;
 pub use overlay::Overlay;
+pub use rectangle::{Rectangle, RectangleIteratorType};
+pub use spot::Spot;
 pub use field_of_view::calculate_field_of_view;
 
 #[derive(Debug)]

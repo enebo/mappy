@@ -1,11 +1,11 @@
-use mappy::Map;
+use mappy::{Cardinality::Zero, Map, Spot};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
 
-fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
+fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char, char> {
     let mut map = Map::new("map", MAP_WIDTH, MAP_HEIGHT, &|_| '.');
     let mut rng = rand::thread_rng();
 
@@ -17,7 +17,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
             rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if &target != start && &target != end {
-            map.set(&target, '#');
+            map.set(&target, Spot::new('#', Zero));
         }
     }
 

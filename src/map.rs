@@ -2,26 +2,24 @@ use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{add_delta, Overlay};
-use crate::rectangle::Rectangle;
+use crate::{add_delta, Cardinality::Zero, Overlay, Rectangle, Spot};
 
-
-pub struct Map<T: PartialEq> {
+pub struct Map<T: PartialEq, I: PartialEq> {
     pub name: String,
     pub width: usize,
     pub height: usize,
     // FIXME: A trait for different shape rooms is desired here but until I understand what the needs are we will use one struct
     pub rooms: Vec<Rectangle>,
-    map: Array<T, Ix2>,
+    map: Array<Spot<T, I>, Ix2>,
 }
 
-struct MapIterator<'a, T: PartialEq> {
-    map: &'a Map<T>,
+struct MapIterator<'a, T: PartialEq, I: PartialEq> {
+    map: &'a Map<T, I>,
     index: usize,
 }
 
-impl<'a, T: PartialEq> MapIterator<'a, T> {
-    fn new(map: &'a Map<T>) -> Self {
+impl<'a, T: PartialEq, I: PartialEq> MapIterator<'a, T, I> {
+    fn new(map: &'a Map<T, I>) -> Self {
         Self {
             map,
             index: 0,
@@ -29,8 +27,8 @@ impl<'a, T: PartialEq> MapIterator<'a, T> {
     }
 }
 
-impl<'a, T: PartialEq> Iterator for MapIterator<'a, T> {
-    type Item = ((usize, usize), &'a T);
+impl<'a, T: PartialEq, I: PartialEq> Iterator for MapIterator<'a, T, I> {
+    type Item = ((usize, usize), &'a Spot<T, I>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.map.map.len() {
@@ -47,8 +45,8 @@ impl<'a, T: PartialEq> Iterator for MapIterator<'a, T> {
 
 
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
-struct CoordIterator<'a, T: PartialEq, U: PartialEq> {
-    map: &'a Map<T>,
+struct CoordIterator<'a, T: PartialEq, I: PartialEq, U: PartialEq> {
+    map: &'a Map<T, I>,
     loc: (usize, usize),
     // Current index in POINTS
     index: usize,
@@ -57,8 +55,8 @@ struct CoordIterator<'a, T: PartialEq, U: PartialEq> {
     include_diagonals: bool,
 }
 
-impl<'a, T: PartialEq, U: PartialEq> CoordIterator<'a, T, U> {
-    fn new(map: &'a Map<T>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U, include_diagonals: bool) -> Self {
+impl<'a, T: PartialEq, I: PartialEq, U: PartialEq> CoordIterator<'a, T, I, U> {
+    fn new(map: &'a Map<T, I>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U, include_diagonals: bool) -> Self {
         Self {
             map,
             loc: *loc,
@@ -88,7 +86,7 @@ const SIMPLE_POINTS: [(isize, isize); 4] = [
     (0, 1),    // down
 ];
 
-impl<'a, T: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
+impl<'a, T: PartialEq, I: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, I, U> {
     type Item = ((usize, usize), U);
 
     #[inline]
@@ -101,7 +99,7 @@ impl<'a, T: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
 
                 if let Some(loc) = add_delta(&self.loc, &delta) {
                     if let Some(tile) = self.map.get(&loc) {
-                        let test = (self.available)(&tile);
+                        let test = (self.available)(&tile.solid);
                         if test != self.invalid {
                             return Some((loc, test))
                         }
@@ -116,7 +114,7 @@ impl<'a, T: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
 
                 if let Some(loc) = add_delta(&self.loc, &delta) {
                     if let Some(tile) = self.map.get(&loc) {
-                        let test = (self.available)(&tile);
+                        let test = (self.available)(&tile.solid);
                         if test != self.invalid {
                             return Some((loc, test))
                         }
@@ -130,7 +128,7 @@ impl<'a, T: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, U> {
     }
 }
 
-pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<Map<char>, ()> {
+pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<Map<char, char>, ()> {
     let rows: Vec<&str> = ascii_map.split_terminator('\n').collect();
     let height = rows.len();
 
@@ -146,26 +144,33 @@ pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<M
     }
 
     let default_fn = |_| '.';
-    let mut map: Map<char> = Map::new(name.into(), width, height, &default_fn);
+    let mut map: Map<char, char> = Map::new(name.into(), width, height, &default_fn);
 
 
     for (y, row) in rows.iter().enumerate() {
         for (x, tile) in row.chars().enumerate() {
-            map.set(&(x, y), tile);
+            map.set(&(x, y), Spot::new(tile, Zero));
         }
     }
 
     Ok(map)
 }
 
-impl<T: PartialEq> Map<T> {
+impl<T: PartialEq, I: PartialEq> Map<T, I> {
     pub fn new<S: Into<String>>(name: S, width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
+        let default = |loc: (usize, usize)| {
+            Spot {
+                solid: (default_fn)(loc),
+                items: Zero,
+            }
+        };
+
         Self {
             name: name.into(),
             width,
             height,
             rooms: vec![],
-            map: Array::<T, Ix2>::from_shape_fn((width, height), default_fn),
+            map: Array::<Spot<T, I>, Ix2>::from_shape_fn((width, height), default),
         }
     }
 
@@ -178,7 +183,7 @@ impl<T: PartialEq> Map<T> {
     }
 
     #[inline]
-    pub fn get(&self, loc: &(usize, usize)) -> Option<&T> {
+    pub fn get(&self, loc: &(usize, usize)) -> Option<&Spot<T, I>> {
         self.map.get(*loc)
     }
 
@@ -188,7 +193,7 @@ impl<T: PartialEq> Map<T> {
     }
 
     #[inline]
-    pub fn set(&mut self, loc: &(usize, usize), tile: T) -> bool {
+    pub fn set(&mut self, loc: &(usize, usize), tile: Spot<T, I>) -> bool {
         let spot = self.map.get_mut(*loc);
         let found = spot.is_some();
 
@@ -216,7 +221,7 @@ impl<T: PartialEq> Map<T> {
         absdiff(p1.0, p2.0) + absdiff(p1.1, p2.1)
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a T)> + 'a {
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Spot<T, I>)> + 'a {
         MapIterator::new(self)
     }
 
@@ -257,7 +262,7 @@ impl<T: PartialEq> Map<T> {
               |i| i == end)
     }
 
-    pub fn find_random_tile_loc(&self, available: &dyn Fn(&T) -> bool) -> Result<(usize, usize), ()> {
+    pub fn find_random_tile_loc(&self, available: &dyn Fn(&Spot<T, I>) -> bool) -> Result<(usize, usize), ()> {
         let room_count = self.rooms.len();
         let room_index = thread_rng().gen_range(0, room_count);
         let room = self.rooms.get(room_index).unwrap();
@@ -286,10 +291,9 @@ impl<T: Clone + PartialEq> Display for Map<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap};
-    use crate::Map;
+    use std::collections::HashMap;
+    use crate::{Cardinality::Zero, Map, Rectangle, Spot};
     use crate::map::generate_ascii_map;
-    use crate::rectangle::Rectangle;
 
     #[test]
     fn test_random_tile_loc() {
@@ -299,15 +303,15 @@ mod tests {
         let mut map = Map::new("map", 3, 3, &|_| '.');
         let room = Rectangle::new(0, 0, 3, 3).unwrap();
         map.add_room(room);
-        assert!(map.find_random_tile_loc(&|c| *c == '.').is_ok());
+        assert!(map.find_random_tile_loc(&|c: &Spot<char, char>| c.solid == '.').is_ok());
 
-        assert!(map.find_random_tile_loc(&|c| *c != '.').is_err());
+        assert!(map.find_random_tile_loc(&|c: &Spot<char, char>| c.solid != '.').is_err());
     }
 
     #[test]
     fn test_is_valid_loc() {
         let width = 5;
-        let map = Map::new("map", width, 10, &|_| '.');
+        let map: Map<char, char> = Map::new("map", width, 10, &|_| '.');
 
         assert!(map.is_valid_loc(&(0, 0)));
         assert!(map.is_valid_loc(&(1, 0)));
@@ -319,7 +323,7 @@ mod tests {
     #[test]
     fn test_point_for() {
         let width = 5;
-        let map = Map::new("map", width, 10, &|_| '.');
+        let map: Map<char, char> = Map::new("map", width, 10, &|_| '.');
 
         assert_eq!(map.point_for(0), (0, 0));
         assert_eq!(map.point_for(1), (1, 0));
@@ -329,18 +333,18 @@ mod tests {
     #[test]
     fn test_get_and_set() {
         let width = 5;
-        let mut map = Map::new("map", width, 10, &|_| '.');
+        let mut map: Map<char, char> = Map::new("map", width, 10, &|_| '.');
 
         let loc = (0, 0);
-        assert_eq!(map.get(&loc).unwrap(), &'.');
-        map.set(&loc, '=');
-        assert_eq!(map.get(&loc).unwrap(), &'=');
+        assert_eq!(map.get(&loc).unwrap().solid, '.');
+        map.set(&loc, Spot::new('=', Zero));
+        assert_eq!(map.get(&loc).unwrap().solid, '=');
     }
 
     #[test]
     fn test_adjacent_ats() {
         let width = 5;
-        let map = Map::new("map", width, 10, &|_| '.');
+        let map: Map<char, char> = Map::new("map", width, 10, &|_| '.');
         let available = |tile: &char| if tile == &'.' { 1 } else { 0 } ;
 
         //  +--
@@ -389,7 +393,7 @@ mod tests {
                           #..######.#..#\n\
                           #............#\n\
                           ##############";
-        let map = generate_ascii_map("map", map_string).unwrap();
+        let map: Map<char, char> = generate_ascii_map("map", map_string).unwrap();
 
         let mut pattern = map.adjacent_paths(&(0, 0), &|c| *c == '#', false);
         println!("Upper left corner");
@@ -409,7 +413,6 @@ mod tests {
         println!("Pattern: {:03b}", ((pattern >> 3) & 7));
         println!("Pattern: {:03b}", (pattern & 7));
         assert_eq!(pattern, 0b_111_101_111);
-
     }
 
     #[test]
@@ -423,7 +426,7 @@ mod tests {
                                 ##############";
 
 
-        let mut map = generate_ascii_map("map", map_string).unwrap();
+        let mut map: Map<char, char> = generate_ascii_map("map", map_string).unwrap();
         let mut weights = HashMap::new();
         weights.insert('.', 1 as usize);
         let available = |tile: &char| *weights.get(tile).unwrap_or(&0);
@@ -434,12 +437,15 @@ mod tests {
             let route: Vec<_> = path.iter().collect();
             println!("Path {:?}", route);
             for i in &path {
-                map.set(i, 'x');
+                map.set(i, Spot::new('x', Zero));
             }
 
             // FIXME: Add weighted test (use 123 as tiles which will just be their weight.
             // FIXME: WOT!
-            for line in map.iter().map(|(_, tile)| *tile).collect::<Vec<char>>().chunks(map.width) {
+            for line in map
+                .iter()
+                .map(|(_, tile)| tile.solid)
+                .collect::<Vec<char>>().chunks(map.width) {
                 for c in line {
                     print!("{}", *c);
                 }
@@ -454,9 +460,9 @@ mod tests {
         let map_string = "123\n\
                                 #.#\n\
                                 ###";
-        let map = generate_ascii_map("map", map_string).unwrap();
+        let map: Map<char, char> = generate_ascii_map("map", map_string).unwrap();
 
-        let string: String = map.iter().map(|(_, tile)| tile).collect();
+        let string: String = map.iter().map(|(_, tile)| tile.solid).collect();
 
         assert_eq!(string, "123#.####");
     }

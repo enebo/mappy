@@ -1,11 +1,11 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
-use mappy::{calculate_field_of_view, Map};
+use mappy::{calculate_field_of_view, Cardinality::Zero, Map, Spot};
 
 pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
 
-fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
+fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char, char> {
     let mut map = Map::new("map", MAP_WIDTH, MAP_HEIGHT, &|_| '.');
     let mut rng = rand::thread_rng();
 
@@ -17,7 +17,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
             rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if &target != start && &target != end {
-            map.set(&target, '#');
+            map.set(&target, Spot::new('#', Zero));
         }
     }
 
@@ -26,7 +26,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char> {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let (start, end) = ((1, MAP_HEIGHT - 1), (MAP_WIDTH - 3, MAP_HEIGHT - 1));
-    let visible = |tile: &char| tile == &'.';
+    let visible = |tile: &Spot<char, char>| tile.solid == '.';
 
     c.bench_function("field_of_view", |b| {
         b.iter(|| {

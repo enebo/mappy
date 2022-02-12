@@ -1,5 +1,4 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use mappy::Map;
 use mappy::map::generate_ascii_map;
 
 pub const MAP_WIDTH: usize = 80;

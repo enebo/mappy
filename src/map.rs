@@ -4,7 +4,7 @@ use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
 use crate::{add_delta, Cardinality::Zero, Overlay, Rectangle, Spot};
 
-pub struct Map<T: PartialEq, I: PartialEq> {
+pub struct Map<T: PartialEq, I: Default + PartialEq> {
     pub name: String,
     pub width: usize,
     pub height: usize,
@@ -13,12 +13,12 @@ pub struct Map<T: PartialEq, I: PartialEq> {
     map: Array<Spot<T, I>, Ix2>,
 }
 
-struct MapIterator<'a, T: PartialEq, I: PartialEq> {
+struct MapIterator<'a, T: PartialEq, I: Default + PartialEq> {
     map: &'a Map<T, I>,
     index: usize,
 }
 
-impl<'a, T: PartialEq, I: PartialEq> MapIterator<'a, T, I> {
+impl<'a, T: PartialEq, I: Default + PartialEq> MapIterator<'a, T, I> {
     fn new(map: &'a Map<T, I>) -> Self {
         Self {
             map,
@@ -27,7 +27,7 @@ impl<'a, T: PartialEq, I: PartialEq> MapIterator<'a, T, I> {
     }
 }
 
-impl<'a, T: PartialEq, I: PartialEq> Iterator for MapIterator<'a, T, I> {
+impl<'a, T: PartialEq, I: Default + PartialEq> Iterator for MapIterator<'a, T, I> {
     type Item = ((usize, usize), &'a Spot<T, I>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -45,7 +45,7 @@ impl<'a, T: PartialEq, I: PartialEq> Iterator for MapIterator<'a, T, I> {
 
 
 // FIXME: I had wanted loc to be reference but life time woes once I hit calling astar in shortest path.
-struct CoordIterator<'a, T: PartialEq, I: PartialEq, U: PartialEq> {
+struct CoordIterator<'a, T: PartialEq, I: Default + PartialEq, U: PartialEq> {
     map: &'a Map<T, I>,
     loc: (usize, usize),
     // Current index in POINTS
@@ -55,7 +55,7 @@ struct CoordIterator<'a, T: PartialEq, I: PartialEq, U: PartialEq> {
     include_diagonals: bool,
 }
 
-impl<'a, T: PartialEq, I: PartialEq, U: PartialEq> CoordIterator<'a, T, I, U> {
+impl<'a, T: PartialEq, I: Default + PartialEq, U: PartialEq> CoordIterator<'a, T, I, U> {
     fn new(map: &'a Map<T, I>, loc: &(usize, usize), available: &'a (dyn Fn(&T) -> U + 'a), invalid: U, include_diagonals: bool) -> Self {
         Self {
             map,
@@ -86,7 +86,7 @@ const SIMPLE_POINTS: [(isize, isize); 4] = [
     (0, 1),    // down
 ];
 
-impl<'a, T: PartialEq, I: PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, I, U> {
+impl<'a, T: PartialEq, I: Default + PartialEq, U: PartialEq> Iterator for CoordIterator<'a, T, I, U> {
     type Item = ((usize, usize), U);
 
     #[inline]
@@ -156,7 +156,7 @@ pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<M
     Ok(map)
 }
 
-impl<T: PartialEq, I: PartialEq> Map<T, I> {
+impl<T: PartialEq, I: Default + PartialEq> Map<T, I> {
     pub fn new<S: Into<String>>(name: S, width: usize, height: usize, default_fn: &dyn Fn((usize, usize)) -> T) -> Self {
         let default = |loc: (usize, usize)| {
             Spot {
@@ -185,6 +185,10 @@ impl<T: PartialEq, I: PartialEq> Map<T, I> {
     #[inline]
     pub fn get(&self, loc: &(usize, usize)) -> Option<&Spot<T, I>> {
         self.map.get(*loc)
+    }
+
+    pub fn get_mut(&mut self, loc: &(usize, usize)) -> Option<&mut Spot<T, I>> {
+        self.map.get_mut(*loc)
     }
 
     #[inline]

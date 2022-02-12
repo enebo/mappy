@@ -3,13 +3,13 @@ use rand::{Rng, thread_rng};
 use crate::cardinality::Cardinality::Zero;
 use crate::{Map, Rectangle, RectangleIteratorType, Spot};
 
-pub struct RoomBuilder<'a, T: PartialEq, I: PartialEq> {
+pub struct RoomBuilder<'a, T: PartialEq, I: Default + PartialEq> {
     map: &'a mut Map<T, I>,
     floor_fn: &'a dyn Fn((usize, usize)) -> T,
     wall_fn: &'a dyn Fn((usize, usize)) -> T,
 }
 
-impl<'a, T: PartialEq, I: PartialEq> RoomBuilder<'a, T, I> {
+impl<'a, T: PartialEq, I: Default + PartialEq> RoomBuilder<'a, T, I> {
     pub fn new(map: &'a mut Map<T, I>, floor_fn: &'a dyn Fn((usize, usize)) -> T, wall_fn: &'a dyn Fn((usize, usize)) -> T) -> Self {
         Self {
             map,

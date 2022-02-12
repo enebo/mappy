@@ -14,7 +14,7 @@ const MULTIPLIERS: [(isize, isize, isize, isize); 8] = [
 // FIXME: probably want a more features FOV map which can be merged with actual map for at least debugging.
 
 // http://www.roguebasin.com/index.php/FOV_using_recursive_shadowcasting
-pub fn calculate_field_of_view<T: PartialEq, I: PartialEq>(map: &Map<T, I>, start: &(usize, usize), radius: usize,
+pub fn calculate_field_of_view<T: PartialEq, I: Default + PartialEq>(map: &Map<T, I>, start: &(usize, usize), radius: usize,
                                light_map: &mut Overlay<bool>, visible: &dyn Fn(&Spot<T, I>) -> bool) {
     light_map.reset();
     light_map.set(*start, true);
@@ -24,7 +24,7 @@ pub fn calculate_field_of_view<T: PartialEq, I: PartialEq>(map: &Map<T, I>, star
     }
 }
 
-fn shadow_cast<T: PartialEq, I: PartialEq>(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
+fn shadow_cast<T: PartialEq, I: Default + PartialEq>(row: usize, mut begin: f32, end: f32, mults: (isize, isize, isize, isize),
                radius: usize, start: &(usize, usize), light_map: &mut Overlay<bool>, map: &Map<T, I>,
                visible: &dyn Fn(&Spot<T, I>) -> bool) {
     if begin < end {

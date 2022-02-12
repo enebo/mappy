@@ -1,5 +1,5 @@
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Cardinality<I> {
     Zero,
     One(I),

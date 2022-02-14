@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
-use mappy::{calculate_field_of_view, Cardinality::Zero, Map, Spot};
+use mappy::{calculate_field_of_view, Map, Spot};
 
 pub const MAP_WIDTH: usize = 80;
 pub const MAP_HEIGHT: usize = 80;
@@ -17,7 +17,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char, char> {
             rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if &target != start && &target != end {
-            map.set(&target, Spot::new('#', Zero));
+            map.set(&target, Spot::new('#', None));
         }
     }
 

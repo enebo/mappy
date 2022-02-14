@@ -1,4 +1,4 @@
-use mappy::{Cardinality::Zero, Map, Spot};
+use mappy::{Map, Spot};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
@@ -17,7 +17,7 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char, char> {
             rng.gen_range(0, MAP_HEIGHT as usize - 1)
         );
         if &target != start && &target != end {
-            map.set(&target, Spot::new('#', Zero));
+            map.set(&target, Spot::new('#', None));
         }
     }
 

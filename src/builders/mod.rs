@@ -1,6 +1,5 @@
 use std::cmp::{max, min};
 use rand::{Rng, thread_rng};
-use crate::cardinality::Cardinality::Zero;
 use crate::{Map, Rectangle, RectangleIteratorType, Spot};
 
 pub struct RoomBuilder<'a, T: PartialEq, I: Default + PartialEq> {
@@ -71,21 +70,21 @@ impl<'a, T: PartialEq, I: Default + PartialEq> RoomBuilder<'a, T, I> {
                 RectangleIteratorType::BODY => self.floor_fn
             };
 
-            self.map.set(&point, Spot::new(tile_fn(point), Zero));
+            self.map.set(&point, Spot::new(tile_fn(point), None));
         }
     }
 
     fn render_horizontal_tunnel(&mut self, start_x: usize, end_x: usize, y: usize) {
         for x in min(start_x, end_x) ..= max(start_x, end_x) {
             let loc = (x, y);
-            self.map.set(&loc, Spot::new((self.floor_fn)(loc), Zero));
+            self.map.set(&loc, Spot::new((self.floor_fn)(loc), None));
         }
     }
 
     fn render_vertical_tunnel(&mut self, start_y: usize, end_y: usize, x: usize) {
         for y in min(start_y, end_y) ..= max(start_y, end_y) {
             let loc = (x, y);
-            self.map.set(&loc, Spot::new((self.floor_fn)(loc), Zero));
+            self.map.set(&loc, Spot::new((self.floor_fn)(loc), None));
         }
     }
 }

@@ -2,7 +2,7 @@ use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
 use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
-use crate::{add_delta, Cardinality::Zero, Overlay, Rectangle, Spot};
+use crate::{add_delta, Overlay, Rectangle, Spot};
 
 pub struct Map<T: PartialEq, I: Default + PartialEq> {
     pub name: String,
@@ -149,7 +149,7 @@ pub fn generate_ascii_map<S: Into<String>>(name: S, ascii_map: &str) -> Result<M
 
     for (y, row) in rows.iter().enumerate() {
         for (x, tile) in row.chars().enumerate() {
-            map.set(&(x, y), Spot::new(tile, Zero));
+            map.set(&(x, y), Spot::new(tile, None));
         }
     }
 
@@ -161,7 +161,7 @@ impl<T: PartialEq, I: Default + PartialEq> Map<T, I> {
         let default = |loc: (usize, usize)| {
             Spot {
                 solid: (default_fn)(loc),
-                items: Zero,
+                items: None,
             }
         };
 
@@ -296,7 +296,7 @@ impl<T: Clone + PartialEq> Display for Map<T> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use crate::{Cardinality::Zero, Map, Rectangle, Spot};
+    use crate::{Map, Rectangle, Spot};
     use crate::map::generate_ascii_map;
 
     #[test]
@@ -341,7 +341,7 @@ mod tests {
 
         let loc = (0, 0);
         assert_eq!(map.get(&loc).unwrap().solid, '.');
-        map.set(&loc, Spot::new('=', Zero));
+        map.set(&loc, Spot::new('=', None));
         assert_eq!(map.get(&loc).unwrap().solid, '=');
     }
 
@@ -441,7 +441,7 @@ mod tests {
             let route: Vec<_> = path.iter().collect();
             println!("Path {:?}", route);
             for i in &path {
-                map.set(i, Spot::new('x', Zero));
+                map.set(i, Spot::new('x', None));
             }
 
             // FIXME: Add weighted test (use 123 as tiles which will just be their weight.

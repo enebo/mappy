@@ -13,8 +13,8 @@ fn make_map(start: &(usize, usize), end: &(usize, usize)) -> Map<char, char> {
     let n_walls = 200;
     for _ in 0..n_walls {
         let target = (
-            rng.gen_range(0, MAP_WIDTH as usize - 1),
-            rng.gen_range(0, MAP_HEIGHT as usize - 1)
+            rng.gen_range(0..MAP_WIDTH as usize),
+            rng.gen_range(0..MAP_HEIGHT as usize)
         );
         if &target != start && &target != end {
             map.set(&target, Spot::new('#', None));

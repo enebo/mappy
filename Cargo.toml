@@ -25,7 +25,7 @@ name = "adjacent_paths"
 harness = false
 
 [dependencies]
-nalgebra = "0.29.0"
-ndarray = "0.15.4"
+nalgebra = "0.32.1"
+ndarray = "0.15.6"
 pathfinding = "4.2.1"
 rand = "0.8.5"

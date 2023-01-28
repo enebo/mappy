@@ -1,6 +1,5 @@
 use ndarray::{Array, Ix2};
 use pathfinding::prelude::astar;
-use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
 use crate::{add_delta, Overlay, Rectangle, Spot};
 
@@ -223,7 +222,7 @@ impl<T: PartialEq, I: Default + PartialEq> Map<T, I> {
 
     #[inline]
     fn distance(p1: &(usize, usize), p2: &(usize, usize)) -> usize {
-        absdiff(p1.0, p2.0) + absdiff(p1.1, p2.1)
+        p1.0.abs_diff(p2.0) + p1.1.abs_diff(p2.1)
     }
 
     pub fn iter<'a>(&'a self) -> impl Iterator<Item=((usize, usize), &'a Spot<T, I>)> + 'a {

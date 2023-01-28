@@ -46,7 +46,7 @@ impl Rectangle {
             (1, self.lrc.0 - self.ulc.0 - 1)
         };
 
-        self.ulc.0 + rng.gen_range(start, end)
+        self.ulc.0 + rng.gen_range(start..end)
     }
 
     /// Give us a random valid x coordinate in/on this rectangle.
@@ -61,7 +61,7 @@ impl Rectangle {
             (1, self.lrc.1 - self.ulc.1 - 1)
         };
 
-        self.ulc.1 + rng.gen_range(start, end)
+        self.ulc.1 + rng.gen_range(start..=end)
     }
 }
 

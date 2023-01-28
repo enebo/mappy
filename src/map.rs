@@ -4,6 +4,7 @@ use pathfinding::utils::absdiff;
 use rand::{Rng, thread_rng};
 use crate::{add_delta, Overlay, Rectangle, Spot};
 
+// T: solid, I: item(s)
 pub struct Map<T: PartialEq, I: Default + PartialEq> {
     pub name: String,
     pub width: usize,
@@ -268,7 +269,7 @@ impl<T: PartialEq, I: Default + PartialEq> Map<T, I> {
 
     pub fn find_random_tile_loc(&self, available: &dyn Fn(&Spot<T, I>) -> bool) -> Result<(usize, usize), ()> {
         let room_count = self.rooms.len();
-        let room_index = thread_rng().gen_range(0, room_count);
+        let room_index = thread_rng().gen_range(0..room_count);
         let room = self.rooms.get(room_index).unwrap();
 
         for _ in 0..100 {

@@ -31,10 +31,10 @@ impl<'a, T: PartialEq, I: Default + PartialEq> RoomBuilder<'a, T, I> {
         let mut rooms: Vec<Rectangle> = Vec::with_capacity(max_rooms);
 
         for _ in 0..max_rooms {
-            let width = rng.gen_range(min_size, max_size);
-            let height = rng.gen_range(min_size, max_size);
-            let x = rng.gen_range(0, self.map.width - width - 1);
-            let y = rng.gen_range(0, self.map.height - height - 1);
+            let width = rng.gen_range(min_size..=max_size);
+            let height = rng.gen_range(min_size..=max_size);
+            let x = rng.gen_range(0..self.map.width - width);
+            let y = rng.gen_range(0..self.map.height - height);
             let new_room = Rectangle::new(x, y, width, height).unwrap();
 
             if rooms.iter().find(|room| new_room.intersect(room)).is_none() {
@@ -47,7 +47,7 @@ impl<'a, T: PartialEq, I: Default + PartialEq> RoomBuilder<'a, T, I> {
             let new_center = room.center();
             let old_center = rooms[i].center();
 
-            if rng.gen_range(0, 2) == 1 {
+            if rng.gen_range(0..2) == 1 {
                 self.render_horizontal_tunnel(old_center.0, new_center.0, old_center.1);
                 self.render_vertical_tunnel(old_center.1, new_center.1, new_center.0);
             } else {

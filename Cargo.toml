@@ -9,8 +9,8 @@ lto = true
 overflow-checks = false
 
 [dev-dependencies]
-criterion = "0.3.1"
-rand = "0.7.3"
+criterion = "0.4.0"
+rand = "0.8.5"
 
 [[bench]]
 name = "shortest_path"
@@ -28,4 +28,4 @@ harness = false
 nalgebra = "0.29.0"
 ndarray = "0.15.4"
 pathfinding = "2.2.1"
-rand = "0.7.3"
+rand = "0.8.5"
